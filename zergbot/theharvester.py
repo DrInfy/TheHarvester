@@ -38,10 +38,25 @@ class HarvesterBot(KnowledgeBot):
             ZergUnit(UnitTypeId.ZERGLING, 50),
         ]))
 
+        tactics = SequentialList([
+                PlanDistributeWorkers(),
+                WorkerScout(),
+                SpreadCreep(),
+                InjectLarva(),
+                PlanHeatOverseer(),
+
+                PlanWorkerOnlyDefense(),
+                PlanZoneDefense(),
+                PlanZoneGather(),
+                PlanZoneAttack(),
+                PlanFinishEnemy(),
+            ])
+
         return BuildOrder([
             AutoOverLord(),
             economy,
-            units
+            units,
+            tactics
         ])
 
     async def on_step(self, iteration):
