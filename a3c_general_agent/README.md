@@ -2,9 +2,7 @@
 
 ## Setup (windows)
 
-* [OpenAI Gym](https://github.com/openai/gym) - `pip install gym`
-* [pyglet](https://bitbucket.org/pyglet/pyglet/wiki/Home) - `pip install pyglet` 
-* [TensorFlow](https://www.tensorflow.org/install/) - `pip install tensorflow==1.14`
+`pip install ./a3c_general_agent/requirements.txt`
 
 ## Train
 `python a3c_cartpole.py --train`
