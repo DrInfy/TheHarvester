@@ -2,7 +2,7 @@
 
 ## Setup (windows)
 
-`pip install ./a3c_general_agent/requirements.txt`
+`pip install -r ./a3c_general_agent/requirements.txt`
 
 ### GPU Support
 
