@@ -132,3 +132,4 @@ data/
 games/
 version.txt
 publish/
+a3c_general_agent/tmp/

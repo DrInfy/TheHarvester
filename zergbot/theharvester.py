@@ -1,3 +1,5 @@
+from math import floor
+
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
 from sharpy.plans.tactics.zone_attack import AttackStatus
@@ -35,7 +37,11 @@ class HarvesterBot(KnowledgeBot):
 
         units = Step(lambda k: self.next_action == 1, SequentialList([
             ActBuilding(UnitTypeId.SPAWNINGPOOL),
-            ZergUnit(UnitTypeId.ZERGLING, 50),
+            BuildOrder([
+                Step(RequiredMinerals(500), ActExpand(4)),
+                Step(None, ZergUnit(UnitTypeId.QUEEN, 5), skip_until=lambda k: self.minerals > 150),
+                ZergUnit(UnitTypeId.ZERGLING, 400),
+            ])
         ]))
 
         tactics = SequentialList([
@@ -60,6 +66,12 @@ class HarvesterBot(KnowledgeBot):
         ])
 
     async def on_step(self, iteration):
+        # Manual hard coded bot
+        if self.supply_workers >= 50:
+            self.next_action = 1
+        else:
+            self.next_action = floor(self.time / 90) % 2
+
         if not self.conceded and self.knowledge.game_analyzer.bean_predicting_defeat_for > 5:
             await self.chat_send("pineapple")
             self.conceded = True
