@@ -1,0 +1,4 @@
+gym
+pyglet
+tensorflow==1.14
+matplotlib
