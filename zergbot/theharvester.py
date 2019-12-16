@@ -13,6 +13,7 @@ from sharpy.plans.require import *
 
 from sharpy.knowledges import KnowledgeBot
 from sharpy.plans import BuildOrder
+from zergbot.ml.agents import RandomAgent, SemiScriptedAgent, A3CAgent
 
 
 class HarvesterBot(KnowledgeBot):
@@ -22,6 +23,11 @@ class HarvesterBot(KnowledgeBot):
         self.execute_func = None
         self.conceded = False
         self.next_action = 0
+
+        # todo: make this selection more elegant
+        # self.agent = RandomAgent()
+        self.agent = SemiScriptedAgent()
+        # self.agent = A3CAgent()
 
     async def create_plan(self) -> BuildOrder:
         self.knowledge.data_manager.set_build("self learning")
@@ -66,11 +72,7 @@ class HarvesterBot(KnowledgeBot):
         ])
 
     async def on_step(self, iteration):
-        # Manual hard coded bot
-        if self.supply_workers >= 50:
-            self.next_action = 1
-        else:
-            self.next_action = floor(self.time / 90) % 2
+        self.next_action = self.agent.choose_action((self.time, self.supply_workers, self.supply_army))
 
         if not self.conceded and self.knowledge.game_analyzer.bean_predicting_defeat_for > 5:
             await self.chat_send("pineapple")
