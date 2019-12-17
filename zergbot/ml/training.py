@@ -1,7 +1,7 @@
 import os
 
 import sc2
-from sc2 import Race, Difficulty, Result
+from sc2 import Race, Difficulty, Result, AIBuild
 from sc2.player import Bot, Computer
 from zergbot.ml.agents import ActorCriticModel
 from zergbot.theharvester import HarvesterBot
@@ -107,7 +107,7 @@ class Worker:
             sc2.run_game(sc2.maps.get("AbyssalReefLE"), [
                 bot1,
                 # Computer(Race.Terran, Difficulty.VeryHard),
-                Computer(Race.Terran, Difficulty.Medium)
+                Computer(Race.Terran, Difficulty.VeryHard, AIBuild.Macro)
             ], realtime=False)
 
             self.ep_loss = 0
