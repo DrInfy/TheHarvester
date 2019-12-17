@@ -67,6 +67,8 @@ class HarvesterBot(KnowledgeBot):
 
     async def on_step(self, iteration):
         self.next_action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army])
+
+        # todo: turn off for ladder.
         if self.next_action == 0:
             self.client.debug_text_screen("ECON", (0.01, 0.01), (0, 255, 0), 16)
         else:
