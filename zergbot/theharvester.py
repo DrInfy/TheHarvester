@@ -67,6 +67,10 @@ class HarvesterBot(KnowledgeBot):
 
     async def on_step(self, iteration):
         self.next_action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army])
+        if self.next_action == 0:
+            self.client.debug_text_screen("ECON", (0.01, 0.01), (0, 255, 0), 16)
+        else:
+            self.client.debug_text_screen("ARMY", (0.01, 0.01), (255, 0, 0), 16)
 
         if not self.conceded and self.knowledge.game_analyzer.bean_predicting_defeat_for > 5:
             await self.chat_send("pineapple")
