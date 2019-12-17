@@ -18,6 +18,7 @@ tf.enable_eager_execution()
 
 LEARNING_RATE = 0.001
 SAVE_DIR = "./data/"
+MODEL_FILE_NAME = 'model.h5'
 MAX_EPS = 10
 GAMMA = 0.99
 
@@ -34,6 +35,10 @@ class MasterAgent():
         self.action_size = 2
         self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
         self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+
+        model_file_path = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+        if os.path.isfile(model_file_path):
+            self.global_model.load_weights(model_file_path)
 
     def train(self):
         res_queue = Queue()
@@ -133,7 +138,7 @@ class Worker:
                 print("Saving best model to {}, "
                       "episode score: {}".format(self.save_dir, bot1.ai.agent.ep_reward))
                 self.global_model.save_weights(
-                    os.path.join(self.save_dir, 'model.h5')
+                    os.path.join(self.save_dir, MODEL_FILE_NAME)
                 )
                 # Worker.best_score = ep_reward
             Worker.global_episode += 1
