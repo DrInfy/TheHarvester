@@ -1,3 +1,5 @@
+from typing import Dict, Callable
+
 from sc2 import UnitTypeId, Result
 from sharpy.knowledges import KnowledgeBot
 from sharpy.plans import BuildOrder
@@ -7,24 +9,38 @@ from sharpy.plans.acts.zerg import *
 from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
-from zergbot.ml.agents import A3CAgent
+from zergbot.ml.agents import *
+
+agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
+    "learning": lambda s, a: A3CAgent(s, a),
+    "learning2": lambda s, a: A3CAgent(s, a),
+    "random": lambda s, a: RandomAgent(s, a),
+    "scripted": lambda s, a: SemiScriptedAgent(s, a)
+}
 
 
 class HarvesterBot(KnowledgeBot):
-    def __init__(self, state_size, action_size, build: str = "default"):
+    agent: BaseMLAgent
+
+    def __init__(self, build: str = "learning"):
         super().__init__("Harvester")
+        if build not in agents:
+            raise ValueError(f'{build} does not exist')
+        self.build_text = build
         self.distribute = None
         self.execute_func = None
         self.conceded = False
         self.next_action = 0
+        # todo: build proper environment that gives state_size, action_size based on what the bot can do
+        self.initialize_agent(3, 2)
 
-        # todo: make this selection more elegant
-        # self.agent = RandomAgent()
-        # self.agent = SemiScriptedAgent()
-        self.agent = A3CAgent(state_size, action_size)
+    def initialize_agent(self, state_size: int, action_size: int):
+        self.agent = agents[self.build_text](state_size, action_size)
 
     async def create_plan(self) -> BuildOrder:
-        self.knowledge.data_manager.set_build("self learning")
+        self.knowledge.data_manager.set_build(self.build_text)
+        self.knowledge.print(self.build_text, "Build")
+
         economy = Step(lambda k: self.next_action == 0, SequentialList([
             ZergUnit(UnitTypeId.DRONE, 15),
             ActExpand(2),

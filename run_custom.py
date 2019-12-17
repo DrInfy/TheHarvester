@@ -89,11 +89,7 @@ Difficulties:
         map_name = random.choice(sc2maps)
 
     enemy_text = args.enemy
-    if enemy_text == "random":
-        enemy_text = get_random_enemy()
 
-    enemy_split: List[str] = enemy_text.split(".")
-    enemy_type = enemy_split.pop(0)
 
     bot_split: List[str] = bot_text.split(".")
     bot_type = bot_split.pop(0)
@@ -102,50 +98,54 @@ Difficulties:
         print(f"Player1 type {bot_text} not found in {enemies.keys()}")
         return
 
+    bot: AbstractPlayer = enemies[bot_type](bot_split)
+
+    setup_game(args.release, args.real_time, bot, bot_text, enemy_text, map_name)
+
+
+def setup_game(release, real_time, bot: AbstractPlayer, bot_text: str, enemy_text: str, map_name: str):
+    if enemy_text == "random":
+        enemy_text = get_random_enemy()
+
+    enemy_split: List[str] = enemy_text.split(".")
+    enemy_type = enemy_split.pop(0)
+    enemy: AbstractPlayer = enemies[enemy_type](enemy_split)
     if enemy_type not in enemies:
         print(f"Enemy type {enemy_type} not found in {enemies.keys()}")
         return
 
-    bot: AbstractPlayer = enemies[bot_type](bot_split)
-    enemy: AbstractPlayer = enemies[enemy_type](enemy_split)
-
     folder = "games"
     if not os.path.isdir(folder):
         os.mkdir(folder)
-
     time = datetime.datetime.now().strftime('%Y-%m-%d %H_%M_%S')
     file_name = f'{enemy_text}_{map_name}_{time}'
     path = f'{folder}/{file_name}.log'
-
     handler = logging.FileHandler(path)
     root_logger.addHandler(handler)
-
-    setup_bot(bot, bot_text, enemy_text, args)
-    setup_bot(enemy, enemy_text, bot_text, args)
-
+    setup_bot(bot, bot_text, enemy_text, release)
+    setup_bot(enemy, enemy_text, bot_text, release)
     run_game(
         find_map(map_name),
         [
             bot,
             enemy
         ],
-        realtime=args.real_time,
+        realtime=real_time,
         game_time_limit=(30 * 60),
         save_replay_as=f'{folder}/{file_name}.SC2Replay',
         # raw_affects_selection=args.raw_selection
     )
-
     # release file handle
     root_logger.removeHandler(handler)
     handler.close()
 
 
-def setup_bot(player: AbstractPlayer, bot_code, enemy_text: str, args):
+def setup_bot(player: AbstractPlayer, bot_code, enemy_text: str, release):
     if isinstance(player, Bot) and hasattr(player.ai, "config"):
         my_bot: KnowledgeBot = player.ai
         my_bot.opponent_id = bot_code + "-" + enemy_text
         my_bot.run_custom = True
-        if args.release:
+        if release:
             my_bot.config = get_config(False)
 
 

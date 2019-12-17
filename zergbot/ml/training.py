@@ -1,9 +1,10 @@
 import os
 
 import sc2
+from run_custom import setup_game
 from sc2 import Race, Difficulty, Result, AIBuild
 from sc2.player import Bot, Computer
-from zergbot.ml.agents import ActorCriticModel
+from zergbot.ml.agents import ActorCriticModel, A3CAgent
 from zergbot.theharvester import HarvesterBot
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -66,20 +67,19 @@ class MasterAgent():
 
 
 class TrainingBot(HarvesterBot):
-    def __init__(self, state_size, action_size, build: str = "default"):
-        super().__init__(state_size, action_size, build)
+    def __init__(self, build: str = "learning"):
+        super().__init__(build)
 
         # todo: HACK. Load the global model weights. We can do this because it's single threaded.
         model_file_path = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
         if os.path.isfile(model_file_path):
-            self.agent.local_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
-            self.agent.local_model.load_weights(model_file_path)
+            # noinspection PyTypeChecker
+            a3c_agent: A3CAgent = self.agent
+            a3c_agent.local_model(tf.convert_to_tensor(np.random.random((1, a3c_agent.state_size)), dtype=tf.float32))
+            a3c_agent.local_model.load_weights(model_file_path)
 
-    async def on_step(self, iteration):
-        return await super().on_step(iteration)
 
-    async def on_end(self, game_result: Result):
-        await super().on_end(game_result)
+
 
 
 # class Worker(threading.Thread):
@@ -114,16 +114,13 @@ class Worker:
         total_step = 1
         # mem = Memory()
         while Worker.global_episode < MAX_EPS:
-            bot1 = Bot(Race.Zerg, TrainingBot(3, 2))  # todo: state_size, action_size are hardcoded
+            bot1 = Bot(Race.Zerg, TrainingBot())
 
             if not os.path.exists('replays'):
                 os.makedirs('replays')
-            sc2.run_game(sc2.maps.get("AbyssalReefLE"), [
-                bot1,
-                # Computer(Race.Terran, Difficulty.VeryHard),
-                Computer(Race.Terran, Difficulty.VeryHard, AIBuild.Macro)
-            ], realtime=False,
-                save_replay_as = f'replays/{Worker.global_episode}.SC2Replay')
+
+            # TODO:: Add Worker.global_episode to replay / log name?
+            setup_game(True, False, bot1, "harvester", "ai.zerg.hard.macro", "AbyssalReefLE")
 
             self.ep_loss = 0
 
