@@ -69,6 +69,12 @@ class TrainingBot(HarvesterBot):
     def __init__(self, state_size, action_size, build: str = "default"):
         super().__init__(state_size, action_size, build)
 
+        # todo: HACK. Load the global model weights. We can do this because it's single threaded.
+        model_file_path = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+        if os.path.isfile(model_file_path):
+            self.agent.local_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
+            self.agent.local_model.load_weights(model_file_path)
+
     async def on_step(self, iteration):
         return await super().on_step(iteration)
 
