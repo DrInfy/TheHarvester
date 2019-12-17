@@ -11,39 +11,23 @@ os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import threading
 import numpy as np
 from queue import Queue
-import argparse
 
 import tensorflow as tf
 
 tf.enable_eager_execution()
 
-parser = argparse.ArgumentParser(description='Run A3C algorithm on the game '
-                                             'Cartpole.')
-parser.add_argument('--algorithm', default='a3c', type=str,
-                    help='Choose between \'a3c\' and \'random\'.')
-parser.add_argument('--train', dest='train', action='store_true',
-                    help='Train our model.')
-parser.add_argument('--lr', default=0.001,
-                    help='Learning rate for the shared optimizer.')
-parser.add_argument('--update-freq', default=20, type=int,
-                    help='How often to update the global model.')
-parser.add_argument('--max-eps', default=1000, type=int,
-                    help='Global maximum number of episodes to run.')
-parser.add_argument('--gamma', default=0.99,
-                    help='Discount factor of rewards.')
-parser.add_argument('--save-dir', default='./tmp/', type=str,
-                    help='Directory in which you desire to save the model.')
-args = parser.parse_args()
-
+LEARNING_RATE = 0.001
+SAVE_DIR = "./data/"
+MAX_EPS = 10
+GAMMA = 0.99
 
 class MasterAgent():
     def __init__(self):
-        save_dir = args.save_dir
-        self.save_dir = save_dir
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
+        self.save_dir = SAVE_DIR
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
 
-        self.opt = tf.train.AdamOptimizer(args.lr, use_locking=True)
+        self.opt = tf.train.AdamOptimizer(LEARNING_RATE, use_locking=True)
 
         # todo: could make this more elegant, rather than hardcoding
         self.state_size = 3
@@ -118,12 +102,12 @@ class Worker:
 
         total_step = 1
         # mem = Memory()
-        while Worker.global_episode < args.max_eps:
+        while Worker.global_episode < MAX_EPS:
             bot1 = Bot(Race.Zerg, TrainingBot(3, 2))  # todo: state_size, action_size are hardcoded
             sc2.run_game(sc2.maps.get("AbyssalReefLE"), [
                 bot1,
                 # Computer(Race.Terran, Difficulty.VeryHard),
-                Computer(Race.Terran, Difficulty.Easy)
+                Computer(Race.Terran, Difficulty.Medium)
             ], realtime=False)
 
             self.ep_loss = 0
@@ -131,8 +115,7 @@ class Worker:
             # Calculate gradient wrt to local model. We do so by tracking the
             # variables involved in computing the loss by using tf.GradientTape
             with tf.GradientTape() as tape:
-                total_loss = self.compute_loss(bot1,
-                                               args.gamma)
+                total_loss = self.compute_loss(bot1, GAMMA)
             self.ep_loss += total_loss
             # Calculate local gradients
             grads = tape.gradient(total_loss, bot1.ai.agent.local_model.trainable_weights)
@@ -196,11 +179,3 @@ class Worker:
         total_loss = tf.reduce_mean((0.5 * value_loss + policy_loss))
         return total_loss
 
-
-if __name__ == '__main__':
-    print(args)
-    master = MasterAgent()
-    # if args.train:
-    master.train()
-# else:
-#   master.play()
