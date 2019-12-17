@@ -104,11 +104,15 @@ class Worker:
         # mem = Memory()
         while Worker.global_episode < MAX_EPS:
             bot1 = Bot(Race.Zerg, TrainingBot(3, 2))  # todo: state_size, action_size are hardcoded
+
+            if not os.path.exists('replays'):
+                os.makedirs('replays')
             sc2.run_game(sc2.maps.get("AbyssalReefLE"), [
                 bot1,
                 # Computer(Race.Terran, Difficulty.VeryHard),
                 Computer(Race.Terran, Difficulty.VeryHard, AIBuild.Macro)
-            ], realtime=False)
+            ], realtime=False,
+                save_replay_as = f'replays/{Worker.global_episode}.SC2Replay')
 
             self.ep_loss = 0
 
