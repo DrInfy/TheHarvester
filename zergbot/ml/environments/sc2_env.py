@@ -26,7 +26,7 @@ class Sc2Env:
         self.build = harvester.ml_build
         # TODO: make a version of setup_game that calls manually _host_game instead
         setup_game(True, False, bot1, self.bot_name, self.opponent, self.bot_name)
-        # TODO: on first step, return state
+        # TODO: wait until first on_step, then return current state
         return None
 
     def step(self, action: int) -> Tuple[object, float, bool, dict]:
