@@ -15,12 +15,18 @@ class MlBuild(BuildOrder):
         self.action_size = action_size
         self.state_size = state_size
         self.reward = 0
+        self.game_ended = False
         self.action: int = 0
         super().__init__(orders)
 
     @abstractmethod
+    @property
     def state(self) -> List[int]:
         pass
+
+    @property
+    def score(self) -> float:
+        return self.reward
 
     async def debug_draw(self):
         action_name, color = self.get_action_name_color(self.action)
@@ -30,6 +36,7 @@ class MlBuild(BuildOrder):
         return f'ACT{action}', (255, 255, 255)
 
     def on_end(self, game_result: Result):
+        self.game_ended = True
         self.reward = REWARD_TIE
         if game_result == Result.Victory:
             self.reward = REWARD_WIN

@@ -27,6 +27,7 @@ builds: Dict[str, Callable[[], MlBuild]] = {
 class HarvesterBot(KnowledgeBot):
     agent: BaseMLAgent
     ml_build: MlBuild
+
     def __init__(self, agent: Union[str, BaseMLAgent] = "random", build: str = "default"):
         super().__init__("Harvester")
         self.agent = agent
@@ -51,45 +52,7 @@ class HarvesterBot(KnowledgeBot):
         self.knowledge.data_manager.set_build(self.build_text)
         self.knowledge.print(self.build_text, "Build")
 
-        economy = Step(lambda k: self.next_action == 0, SequentialList([
-            ZergUnit(UnitTypeId.DRONE, 15),
-            ActExpand(2),
-            ZergUnit(UnitTypeId.DRONE, 24),
-            ActExpand(3),
-            ZergUnit(UnitTypeId.DRONE, 38),
-            ActExpand(4),
-            ZergUnit(UnitTypeId.DRONE, 50),
-        ]))
-
-        units = Step(lambda k: self.next_action == 1, SequentialList([
-            ActBuilding(UnitTypeId.SPAWNINGPOOL),
-            BuildOrder([
-                Step(RequiredMinerals(500), ActExpand(4)),
-                Step(None, ZergUnit(UnitTypeId.QUEEN, 5), skip_until=lambda k: self.minerals > 150),
-                ZergUnit(UnitTypeId.ZERGLING, 400),
-            ])
-        ]))
-
-        tactics = SequentialList([
-            PlanDistributeWorkers(),
-            WorkerScout(),
-            SpreadCreep(),
-            InjectLarva(),
-            PlanHeatOverseer(),
-
-            PlanWorkerOnlyDefense(),
-            PlanZoneDefense(),
-            PlanZoneGather(),
-            PlanZoneAttack(),
-            PlanFinishEnemy(),
-        ])
-
-        return BuildOrder([
-            AutoOverLord(),
-            economy,
-            units,
-            tactics
-        ])
+        return self.ml_build
 
     async def on_step(self, iteration):
         self.next_action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army])
@@ -106,5 +69,5 @@ class HarvesterBot(KnowledgeBot):
         return await super().on_step(iteration)
 
     async def on_end(self, game_result: Result):
-        self.agent.on_end(game_result)
+        self.ml_build.on_end(game_result)
         await super().on_end(game_result)
