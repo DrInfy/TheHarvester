@@ -1,4 +1,4 @@
-from typing import Dict, Callable
+from typing import Dict, Callable, Union
 
 from sc2 import UnitTypeId, Result
 from sharpy.knowledges import KnowledgeBot
@@ -9,21 +9,27 @@ from sharpy.plans.acts.zerg import *
 from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
+from zergbot.builds import *
 from zergbot.ml.agents import *
 
 agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
     "learning": lambda s, a: A3CAgent(s, a),
-    "learning2": lambda s, a: A3CAgent(s, a),
     "random": lambda s, a: RandomAgent(s, a),
     "scripted": lambda s, a: SemiScriptedAgent(s, a)
 }
 
 
+builds: Dict[str, Callable[[], MlBuild]] = {
+    "default": lambda: EconLings_v0()
+}
+
+
 class HarvesterBot(KnowledgeBot):
     agent: BaseMLAgent
-
-    def __init__(self, build: str = "learning"):
+    ml_build: MlBuild
+    def __init__(self, agent: Union[str, BaseMLAgent] = "random", build: str = "default"):
         super().__init__("Harvester")
+        self.agent = agent
         if build not in agents:
             raise ValueError(f'{build} does not exist')
         self.build_text = build
@@ -31,11 +37,15 @@ class HarvesterBot(KnowledgeBot):
         self.execute_func = None
         self.conceded = False
         self.next_action = 0
-        # todo: build proper environment that gives state_size, action_size based on what the bot can do
-        self.initialize_agent(3, 2)
+        self.initialize_agent(agent, build)
 
-    def initialize_agent(self, state_size: int, action_size: int):
-        self.agent = agents[self.build_text](state_size, action_size)
+    def initialize_agent(self, agent: Union[str, BaseMLAgent], build_text):
+        self.ml_build = builds[build_text]()
+
+        if isinstance(agent, BaseMLAgent):
+            self.agent = agent
+        else:
+            self.agent = agents[self.build_text](self.ml_build.state_size, self.ml_build.action_size)
 
     async def create_plan(self) -> BuildOrder:
         self.knowledge.data_manager.set_build(self.build_text)
