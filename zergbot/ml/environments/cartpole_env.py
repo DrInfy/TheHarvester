@@ -15,7 +15,7 @@ class CartPoleEnv(BaseEnv):
         done = False
         try:
             while not done:
-                self.env.render('rgb')
+                # self.env.render('rgb')
                 action = self.on_step(state, reward)
                 state, reward, done, _ = self.env.step(action)
                 if done:
