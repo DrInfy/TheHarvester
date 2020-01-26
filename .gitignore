@@ -133,3 +133,4 @@ games/
 version.txt
 publish/
 a3c_general_agent/tmp/
+runner-stop.txt

@@ -119,7 +119,8 @@ def setup_game(release, real_time, bot: AbstractPlayer, bot_text: str, enemy_tex
     if not os.path.isdir(folder):
         os.mkdir(folder)
     time = datetime.datetime.now().strftime('%Y-%m-%d %H_%M_%S')
-    file_name = f'{enemy_text}_{map_name}_{time}'
+    randomizer = random.randint(0, 999999)
+    file_name = f'{enemy_text}_{map_name}_{time}_{randomizer}'
     path = f'{folder}/{file_name}.log'
     handler = logging.FileHandler(path)
     root_logger.addHandler(handler)
