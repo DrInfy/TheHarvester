@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Union
+from typing import Dict, Callable, Union, List
 
 from sc2 import Result
 from sharpy.knowledges import KnowledgeBot
@@ -24,6 +24,8 @@ class HarvesterBot(KnowledgeBot):
     agent: BaseMLAgent
     ml_build: MlBuild
 
+    num_distraction_workers: int = 3
+
     def __init__(self, agent: Union[str, BaseMLAgent] = "random", build: str = "default"):
         super().__init__("Harvester")
         self.agent = agent
@@ -36,7 +38,7 @@ class HarvesterBot(KnowledgeBot):
         self.next_action = 0
         self.initialize_agent(agent, build)
 
-        self.distraction_worker_tag: int = 0
+        self.distraction_worker_tags: List[int] = []
 
     def initialize_agent(self, agent: Union[str, BaseMLAgent], build_text):
         self.ml_build = builds[build_text]()
@@ -54,17 +56,15 @@ class HarvesterBot(KnowledgeBot):
 
     async def on_step(self, iteration):
 
-        action = self.agent.choose_action(self.ml_build.state, 0)
-        if self.ml_build.state[1]:  # if scouting worker is alive
-            distraction_worker = self.workers.by_tag(self.distraction_worker_tag)
+        state = self.ml_build.state
+        action = self.agent.choose_action(state, 0)
+        if state[1] > 0:  # if a scouting worker is alive
             if action == 0:
-                self.do(distraction_worker.attack(self.enemy_start_locations[0]))
-                self.client.debug_text_screen("ATTACK", (0.01, 0.01), (255, 0, 0), 16)
+                self.attack()
             else:
-                self.do(distraction_worker.move(self.start_location))
-                self.client.debug_text_screen("RETREAT", (0.01, 0.01), (0, 255, 0), 16)
+                self.retreat()
         else:
-            self.client.debug_text_screen("DEAD", (0.01, 0.01), (255, 255, 255), 16)
+            self.dead()
 
 
         return await super().on_step(iteration)
@@ -77,6 +77,20 @@ class HarvesterBot(KnowledgeBot):
     async def on_start(self):
         await super().on_start()
 
-        distraction_worker = self.workers.closest_to(self.enemy_start_locations[0])
-        self.knowledge.roles.set_task(UnitTask.Scouting, distraction_worker)
-        self.distraction_worker_tag = distraction_worker.tag
+        distraction_workers = self.workers.closest_n_units(self.enemy_start_locations[0], HarvesterBot.num_distraction_workers)
+        for worker in distraction_workers:
+            self.knowledge.roles.set_task(UnitTask.Scouting, worker)
+            self.distraction_worker_tags.append(worker.tag)
+
+    def attack(self):
+        self.client.debug_text_screen("ATTACK", (0.01, 0.01), (255, 0, 0), 16)
+        for worker in self.workers.tags_in(self.distraction_worker_tags):
+            self.do(worker.attack(self.enemy_start_locations[0]))
+
+    def retreat(self):
+        self.client.debug_text_screen("RETREAT", (0.01, 0.01), (0, 255, 0), 16)
+        for worker in self.workers.tags_in(self.distraction_worker_tags):
+            self.do(worker.move(self.start_location))
+
+    def dead(self):
+        self.client.debug_text_screen("DEAD", (0.01, 0.01), (255, 255, 255), 16)

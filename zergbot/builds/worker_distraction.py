@@ -20,11 +20,12 @@ class WorkerDistraction_v0(MlBuild):
 
     @property
     def state(self) -> List[int]:
-        try:
-            distraction_worker = self.ai.workers.by_tag(self.ai.distraction_worker_tag)
-            return [len(self.ai.enemy_units.closer_than(2, distraction_worker.position)) > 1, True]
-        except KeyError:
-            return [False, False]
+        # try:
+        workers = self.ai.workers.tags_in(self.ai.distraction_worker_tags).sorted_by_distance_to(self.ai.enemy_start_locations[0])
+        return [len(self.ai.enemy_units.closer_than(2, workers[0].position)) > 1 if len(workers) > 0 else False,
+                len(workers)]
+        # except KeyError:
+        #     return [False, 0]
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
         return [
