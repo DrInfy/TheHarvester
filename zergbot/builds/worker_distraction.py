@@ -19,8 +19,8 @@ num_distraction_workers: int = 3
 
 class WorkerDistraction_v0(MlBuild):
 
-    def __init__(self, agent: BaseMLAgent):
-        super().__init__(agent, 4, 2, self.create_plan())
+    def __init__(self):
+        super().__init__(2, 2, self.create_plan())
         self.distraction_worker_tags: List[int] = []
         self.is_dead = False
 

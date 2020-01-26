@@ -13,7 +13,7 @@ class Sc2Env:
     Environment that simulates what gym has for instant replacement
     Should look similar to gym env in structure: https://github.com/openai/gym/blob/master/gym/core.py
     """
-    def __init__(self, bot_name: str, game_map: str, opponent: str, agent: A3CAgent, agent_build: str):
+    def __init__(self, bot_name: str, game_map: str, opponent: str, agent: str, agent_build: str):
         self.agent = agent
         self.agent_build = agent_build
         self.opponent = opponent

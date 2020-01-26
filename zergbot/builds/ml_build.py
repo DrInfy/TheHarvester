@@ -12,10 +12,12 @@ REWARD_TIE = 0
 
 
 class MlBuild(BuildOrder):
-    def __init__(self, agent: BaseMLAgent, state_size: int, action_size: int,  orders: List[Union[ActBase, List[ActBase]]]):
-        self.action_size = action_size
+    agent: BaseMLAgent  # Initialize after init
+
+    def __init__(self, state_size: int, action_size: int,  orders: List[Union[ActBase, List[ActBase]]]):
+
         self.state_size = state_size
-        self.agent = agent
+        self.action_size = action_size
         self.reward = 0
         self.game_ended = False
         self.action: int = 0

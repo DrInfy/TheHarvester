@@ -17,6 +17,12 @@ if __name__ == '__main__':
         env = Sc2Env("test_bot.workerdistraction",
                      "AbyssalReefLE",
                      "debugmlworkerrushdefender",
-                     A3CAgent(2, 2),
+                     "learning",
                      "workerdistraction")
+
+        # env = Sc2Env("test_bot.default",
+        #              "AbyssalReefLE",
+        #              "debugmlworkerrushdefender",
+        #              "learning",
+        #              "default")
         env.run()

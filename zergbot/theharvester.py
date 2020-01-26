@@ -7,6 +7,7 @@ from sharpy.plans import BuildOrder
 from zergbot.builds import *
 from zergbot.builds.worker_distraction import WorkerDistraction_v0
 from zergbot.ml.agents import *
+from a3c_general_agent.a3c_sc2_migrate import A3CAgent
 
 agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
     "learning": lambda s, a: A3CAgent(s, a),
@@ -14,9 +15,9 @@ agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
     "scripted": lambda s, a: SemiScriptedAgent(s, a)
 }
 
-builds: Dict[str, Callable[[BaseMLAgent], MlBuild]] = {
-    "default": lambda agent: EconLings_v0(agent),
-    "workerdistraction": lambda agent: WorkerDistraction_v0(agent)
+builds: Dict[str, Callable[[], MlBuild]] = {
+    "default": lambda: EconLings_v0(),
+    "workerdistraction": lambda: WorkerDistraction_v0()
 }
 
 
@@ -25,9 +26,8 @@ class HarvesterBot(KnowledgeBot):
     ml_build: MlBuild
 
 
-    def __init__(self, agent: Union[str, BaseMLAgent] = "random", build: str = "default"):
+    def __init__(self, agent: str = "random", build: str = "default"):
         super().__init__("Harvester")
-        self.agent = agent
         if build not in builds:
             raise ValueError(f'{build} does not exist')
         self.build_text = build
@@ -36,13 +36,15 @@ class HarvesterBot(KnowledgeBot):
         self.conceded = False
         self.initialize_agent(agent, build)
 
-    def initialize_agent(self, agent: Union[str, BaseMLAgent], build_text):
+    def initialize_agent(self, agent: str, build_text):
+        self.ml_build = builds[build_text]()
+
         if isinstance(agent, BaseMLAgent):
             self.agent = agent
         else:
-            self.agent = agents[self.build_text](self.ml_build.state_size, self.ml_build.action_size)
+            self.agent = agents[agent](self.ml_build.state_size, self.ml_build.action_size)
 
-        self.ml_build = builds[build_text](self.agent)
+        self.ml_build.agent = self.agent
 
     async def create_plan(self) -> BuildOrder:
         self.knowledge.data_manager.set_build(self.build_text)
