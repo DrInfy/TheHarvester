@@ -20,7 +20,7 @@ num_distraction_workers: int = 3
 class WorkerDistraction_v0(MlBuild):
 
     def __init__(self):
-        super().__init__(2, 2, self.create_plan())
+        super().__init__(2, 2, self.create_plan(), result_multiplier=10000)
         self.distraction_worker_tags: List[int] = []
         self.is_dead = False
 

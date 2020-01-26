@@ -1,6 +1,6 @@
+import logging
 import os
 import pickle
-from queue import Queue
 from typing import List, Union
 
 import numpy as np
@@ -11,12 +11,25 @@ from tensorflow.python.keras import layers
 from filelock.filelock import FileLock
 from zergbot.ml.agents import BaseMLAgent
 
+logger = logging.getLogger(__name__)
+
+SAVE_DIR = "./data/"
+MODEL_NAME = 'model_sc2'
+MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
+MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
+OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
+MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f'{MODEL_FILE_NAME}.lock')
+GLOBAL_RECORDS_FILE_NAME = f'{MODEL_NAME}.records.pkl'
+GLOBAL_RECORDS_FILE_PATH = os.path.join(SAVE_DIR, GLOBAL_RECORDS_FILE_NAME)
+LOG_FILE_NAME = f'{MODEL_NAME}.log'
+LOG_FILE_PATH = os.path.join(SAVE_DIR, LOG_FILE_NAME)
+
 
 def record(episode,
            episode_reward,
            worker_idx,
            global_ep_reward,
-           result_queue,
            total_loss,
            num_steps):
     """Helper function to store score and print statistics.
@@ -26,7 +39,6 @@ def record(episode,
       episode_reward: Reward accumulated over the current episode
       worker_idx: Which thread (worker)
       global_ep_reward: The moving average of the global reward
-      result_queue: Queue storing the moving average of the scores
       total_loss: The total loss accumualted over the current episode
       num_steps: The number of steps the episode took to complete
     """
@@ -34,7 +46,7 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    print(
+    logger.debug(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
@@ -42,7 +54,6 @@ def record(episode,
         f"Steps: {num_steps} | "
         f"Worker: {worker_idx}"
     )
-    result_queue.put(global_ep_reward)
     return global_ep_reward
 
 
@@ -82,15 +93,6 @@ class Memory:
         self.rewards = []
 
 
-SAVE_DIR = "./data/"
-MODEL_NAME = 'model_sc2'
-MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
-MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
-OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
-OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
-MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f'{MODEL_FILE_NAME}.lock')
-
-
 class A3CAgent(BaseMLAgent):
     # Set up global variables across different threads
     global_episode = 0
@@ -115,6 +117,14 @@ class A3CAgent(BaseMLAgent):
                 with open(OPTIMIZER_FILE_PATH, 'wb') as f:
                     pickle.dump(tf.train.AdamOptimizer(learning_rate, use_locking=True), f)
 
+                # Create saved global records
+                with open(GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
+                    global_records = {
+                        'global_episode': 1,
+                        'global_moving_average_reward': 0,
+                    }
+                    pickle.dump(global_records, f)
+
             self.local_model = ActorCriticModel(self.state_size, self.action_size)
             self.local_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
             self.local_model.load_weights(MODEL_FILE_PATH)
@@ -130,9 +140,6 @@ class A3CAgent(BaseMLAgent):
         self.time_count = 0
         self.total_step = 0
         self.gamma = gamma
-
-        # todo: previously these were constructed in the master agent and shared among workers
-        self.result_queue = Queue()
 
         self.ep_loss = 0
 
@@ -168,6 +175,10 @@ class A3CAgent(BaseMLAgent):
             with open(OPTIMIZER_FILE_PATH, 'rb') as f:
                 optimizer = pickle.load(f)
 
+            global_records: dict
+            with open(GLOBAL_RECORDS_FILE_PATH, 'rb') as f:
+                global_records = pickle.load(f)
+
             # work with the file as it is now locked
             self.evaluate_prev_action_reward(reward)
             # Calculate gradient wrt to local model. We do so by tracking the
@@ -182,7 +193,7 @@ class A3CAgent(BaseMLAgent):
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
             # Push local gradients to global model
             optimizer.apply_gradients(zip(grads,
-                                         global_model.trainable_weights))
+                                          global_model.trainable_weights))
             # Update local model with new weights
             self.local_model.set_weights(global_model.get_weights())
 
@@ -194,9 +205,9 @@ class A3CAgent(BaseMLAgent):
             #     record(Worker.global_episode, self.ep_reward, 1, #self.worker_idx,
             #            Worker.global_moving_average_reward, self.result_queue,
             #            self.ep_loss, ep_steps)
-            A3CAgent.global_moving_average_reward = \
-                record(A3CAgent.global_episode, self.ep_reward, 1,  # self.worker_idx,
-                       A3CAgent.global_moving_average_reward, self.result_queue,
+            global_records['global_moving_average_reward'] = \
+                record(global_records['global_episode'], self.ep_reward, 1,  # self.worker_idx,
+                       global_records['global_moving_average_reward'],
                        self.ep_loss, self.ep_steps)
             # We must use a lock to save our model and to print to prevent data races.
             # if self.ep_reward > Worker.best_score:
@@ -211,16 +222,19 @@ class A3CAgent(BaseMLAgent):
                 pickle.dump(optimizer, f)
 
             # Worker.global_episode += 1
-            A3CAgent.global_episode += 1
+            global_records['global_episode'] += 1
 
-            # todo: this isn't how it originally want.
+            # Save global records
+            with open(GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
+                pickle.dump(global_records, f)
+
+            # todo: this isn't how it originally was.
             self.prev_action = None
             self.prev_state = None
             self.ep_reward = 0
             self.ep_steps = 0
             self.time_count = 0
             self.total_step = 0
-            self.result_queue.empty()
             self.ep_loss = 0
 
     def compute_loss(self,
