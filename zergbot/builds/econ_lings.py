@@ -15,17 +15,25 @@ from zergbot.ml.agents import BaseMLAgent
 class EconLings_v0(MlBuild):
 
     def __init__(self):
-        super().__init__(4, 2, self.create_plan())
+        super().__init__(8, 2, self.create_plan())
 
     @property
     def state(self) -> List[Union[int, float]]:
-        return [self.ai.time, self.ai.supply_workers, self.ai.supply_army, self.ai.minerals]
+        return [self.ai.time, self.ai.supply_workers, self.ai.supply_army, self.ai.minerals,
+                len(self.cache.own(UnitTypeId.LARVA)),
+                len(self.cache.own(UnitTypeId.DRONE)),
+                len(self.cache.own(UnitTypeId.ZERGLING)),
+                len(self.cache.own(UnitTypeId.HATCHERY))
+        ]
 
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
         if action == 0:
             return ("ECON", (0, 255, 0))
         return ("ARMY", (255, 0, 0))
 
+    @property
+    def score(self) -> float:
+        return super().score - min(0, self.ai.minerals - 400) / 1000.0
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
         economy = Step(lambda k: self.action == 0, SequentialList([
