@@ -11,12 +11,14 @@ REWARD_TIE = 0
 
 
 class MlBuild(BuildOrder):
-    def __init__(self, state_size: int, action_size: int, orders: List[Union[ActBase, List[ActBase]]]):
+    def __init__(self, state_size: int, action_size: int, orders: List[Union[ActBase, List[ActBase]]],
+                 result_multiplier: float = 1.0):
         self.action_size = action_size
         self.state_size = state_size
         self.reward = 0
         self.game_ended = False
         self.action: int = 0
+        self.result_multiplier: float = result_multiplier
         super().__init__(orders)
 
     @property
@@ -37,8 +39,8 @@ class MlBuild(BuildOrder):
 
     def on_end(self, game_result: Result):
         self.game_ended = True
-        self.reward = REWARD_TIE
+        self.reward = REWARD_TIE*self.result_multiplier
         if game_result == Result.Victory:
-            self.reward = REWARD_WIN
+            self.reward = REWARD_WIN*self.result_multiplier
         elif game_result == Result.Defeat:
-            self.reward = REWARD_LOSE
+            self.reward = REWARD_LOSE*self.result_multiplier

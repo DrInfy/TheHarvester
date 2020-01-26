@@ -1,6 +1,6 @@
 from typing import Dict, Callable, Union, List
 
-from sc2 import Result
+from sc2 import Result, UnitTypeId
 from sharpy.knowledges import KnowledgeBot
 from sharpy.managers.roles import UnitTask
 from sharpy.plans import BuildOrder
@@ -55,9 +55,11 @@ class HarvesterBot(KnowledgeBot):
         return self.ml_build
 
     async def on_step(self, iteration):
+        # enemy workers not mining
+        not_mining_count = len(self.enemy_units.of_type(UnitTypeId.DRONE).filter(lambda unit: unit.is_attacking))
 
         state = self.ml_build.state
-        action = self.agent.choose_action(state, 0)
+        action = self.agent.choose_action(state, not_mining_count)
         if state[1] > 0:  # if a scouting worker is alive
             if action == 0:
                 self.attack()

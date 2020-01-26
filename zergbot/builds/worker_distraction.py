@@ -16,7 +16,7 @@ from zergbot.builds.ml_build import MlBuild
 class WorkerDistraction_v0(MlBuild):
 
     def __init__(self):
-        super().__init__(4, 2, self.create_plan())
+        super().__init__(4, 2, self.create_plan(), result_multiplier=10000)
 
     @property
     def state(self) -> List[int]:
