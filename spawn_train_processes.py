@@ -6,6 +6,7 @@ sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
 import subprocess
 import time
+import platform
 
 STOP_FILE: str = "runner-stop.txt"
 
@@ -15,8 +16,13 @@ if __name__ == '__main__':
     if os.path.isfile(STOP_FILE):
         os.remove(STOP_FILE)
 
-    processes = [subprocess.Popen(["python.exe", TRAINIG_SCRIPT])
-                 for i in range(3)]
+    if platform.system() == 'Linux':
+        cmd = "python3.7"
+    else:
+        cmd = "python.exe"
+
+    processes = [subprocess.Popen([cmd, TRAINIG_SCRIPT])
+                 for i in range(10)]
     run_games = True
 
     while run_games:
