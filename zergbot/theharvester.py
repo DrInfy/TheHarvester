@@ -59,7 +59,7 @@ class HarvesterBot(KnowledgeBot):
         not_mining_count = len(self.enemy_units.of_type(UnitTypeId.DRONE).filter(lambda unit: unit.is_attacking))
 
         state = self.ml_build.state
-        action = self.agent.choose_action(state, not_mining_count)
+        action = self.agent.choose_action(state, not_mining_count-len(self.distraction_worker_tags))
         if state[1] > 0:  # if a scouting worker is alive
             if action == 0:
                 self.attack()
