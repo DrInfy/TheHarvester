@@ -16,7 +16,6 @@ def record(episode,
            episode_reward,
            worker_idx,
            global_ep_reward,
-           result_queue,
            total_loss,
            num_steps):
     """Helper function to store score and print statistics.
@@ -26,7 +25,6 @@ def record(episode,
       episode_reward: Reward accumulated over the current episode
       worker_idx: Which thread (worker)
       global_ep_reward: The moving average of the global reward
-      result_queue: Queue storing the moving average of the scores
       total_loss: The total loss accumualted over the current episode
       num_steps: The number of steps the episode took to complete
     """
@@ -42,7 +40,6 @@ def record(episode,
         f"Steps: {num_steps} | "
         f"Worker: {worker_idx}"
     )
-    result_queue.put(global_ep_reward)
     return global_ep_reward
 
 
@@ -131,9 +128,6 @@ class A3CAgent(BaseMLAgent):
         self.total_step = 0
         self.gamma = gamma
 
-        # todo: previously these were constructed in the master agent and shared among workers
-        self.result_queue = Queue()
-
         self.ep_loss = 0
 
     def evaluate_prev_action_reward(self, reward: float):
@@ -196,7 +190,7 @@ class A3CAgent(BaseMLAgent):
             #            self.ep_loss, ep_steps)
             A3CAgent.global_moving_average_reward = \
                 record(A3CAgent.global_episode, self.ep_reward, 1,  # self.worker_idx,
-                       A3CAgent.global_moving_average_reward, self.result_queue,
+                       A3CAgent.global_moving_average_reward,
                        self.ep_loss, self.ep_steps)
             # We must use a lock to save our model and to print to prevent data races.
             # if self.ep_reward > Worker.best_score:
@@ -220,7 +214,6 @@ class A3CAgent(BaseMLAgent):
             self.ep_steps = 0
             self.time_count = 0
             self.total_step = 0
-            self.result_queue.empty()
             self.ep_loss = 0
 
     def compute_loss(self,
