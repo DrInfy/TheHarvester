@@ -37,6 +37,7 @@ class MlBuild(BuildOrder):
     async def debug_draw(self):
         action_name, color = self.get_action_name_color(self.action)
         self.ai.client.debug_text_screen(action_name, (0.01, 0.01), color, 16)
+        self.ai.client.debug_text_screen(str(self.score), (0.00, 0.05), color, 16)
         await super().debug_draw()
 
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
