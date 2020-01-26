@@ -8,5 +8,8 @@ class RandomAgent(BaseMLAgent):
     """Random Agent that takes random actions in the game.
     """
 
-    def choose_action(self, state: List[Union[float, int]]):
+    def choose_action(self, state: List[Union[float, int]], reward: float):
         return random.randint(0, self.action_size - 1)
+
+    def on_end(self, state: List[Union[float, int]], reward: float):
+        pass

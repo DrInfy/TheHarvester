@@ -157,7 +157,7 @@ enemies = {
 
     # Dynamic bots
     "harvester": (lambda params:
-              Bot(Race.Zerg, HarvesterBot(index_check(params, 0, "default")))),
+              Bot(Race.Zerg, HarvesterBot(index_check(params, 0, "random"), (index_check(params, 1, "default"))))),
 
     # Protoss
     "adept": (lambda params: Bot(Race.Protoss, AdeptRush())),
@@ -178,7 +178,7 @@ enemies = {
     "lingflood": (lambda params: Bot(Race.Zerg, LingFlood(False))),
     "lingspeed": (lambda params: Bot(Race.Zerg, LingFlood(True))),
     "workerrush": (lambda params: Bot(Race.Zerg, WorkerRush())),
-    "hydra":(lambda params: Bot(Race.Zerg, RoachHydra())),
+    "hydra": (lambda params: Bot(Race.Zerg, RoachHydra())),
     "mutalisk": (lambda params: Bot(Race.Zerg, MutaliskBot())),
     "spine": (lambda params: Bot(Race.Zerg, SpineDefender())),
     "randomzerg": (lambda params: Bot(Race.Zerg, RandomZergBot())),
