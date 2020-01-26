@@ -26,7 +26,7 @@ class Sc2Env:
             bot1 = Bot(Race.Zerg, HarvesterBot(self.agent, self.agent_build))
             # TODO: make a version of setup_game that calls manually _host_game instead
             # TODO: currently it runs the whole game, it doesn't just set it up
-            setup_game(True, False, bot1, self.bot_name, self.opponent, self.game_map)
+            setup_game(False, False, bot1, self.bot_name, self.opponent, self.game_map)
         except KeyboardInterrupt:
             print("Received Keyboard Interrupt. Shutting down.")
         finally:

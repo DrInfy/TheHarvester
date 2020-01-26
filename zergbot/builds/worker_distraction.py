@@ -74,7 +74,7 @@ class WorkerDistraction_v0(MlBuild):
             ]),
             SequentialList(
                 [
-                    ActCustom(lambda k: self.attack() if self.action == 0 else self.retreat()),
+                    ActCustom(lambda: self.attack() if self.action == 0 else self.retreat()),
                     PlanDistributeWorkers(),
                     PlanZoneDefense(),
                     AutoOverLord(),
