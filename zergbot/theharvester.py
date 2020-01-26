@@ -7,12 +7,11 @@ from sharpy.plans import BuildOrder
 from zergbot.builds import *
 from zergbot.builds.worker_distraction import WorkerDistraction_v0
 from zergbot.ml.agents import *
-from a3c_general_agent.a3c_sc2_migrate import A3CAgent
 
 agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
-    "learning": lambda s, a: A3CAgent(s, a),
-    "random": lambda s, a: RandomAgent(s, a),
-    "scripted": lambda s, a: SemiScriptedAgent(s, a)
+    "learning": lambda env_name, s, a: A3CAgent(env_name, s, a),
+    "random": lambda env_name, s, a: RandomAgent(s, a),
+    "scripted": lambda env_name, s, a: SemiScriptedAgent(s, a)
 }
 
 builds: Dict[str, Callable[[], MlBuild]] = {
@@ -42,7 +41,7 @@ class HarvesterBot(KnowledgeBot):
         if isinstance(agent, BaseMLAgent):
             self.agent = agent
         else:
-            self.agent = agents[agent](self.ml_build.state_size, self.ml_build.action_size)
+            self.agent = agents[agent](build_text, self.ml_build.state_size, self.ml_build.action_size)
 
         self.ml_build.agent = self.agent
 

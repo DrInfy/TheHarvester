@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from typing import List, Union, Tuple
+import numpy as np
 
 from sc2 import Result
 from sharpy.plans import BuildOrder
@@ -13,7 +14,6 @@ REWARD_TIE = 0
 
 class MlBuild(BuildOrder):
     agent: BaseMLAgent  # Initialize after init
-
 
     def __init__(self, state_size: int, action_size: int, orders: List[Union[ActBase, List[ActBase]]],
                  result_multiplier: float = 1.0):
@@ -43,7 +43,7 @@ class MlBuild(BuildOrder):
         return f'ACT{action}', (255, 255, 255)
 
     async def execute(self) -> bool:
-        current_state = self.state
+        current_state = np.array(self.state)
         self.action = self.agent.choose_action(current_state, self.score)
         return await super().execute()
 

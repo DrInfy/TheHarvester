@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Union
 
+from numpy.core.multiarray import ndarray
+
 
 class BaseMLAgent(ABC):
     """Base machine learning agent.
@@ -12,8 +14,12 @@ class BaseMLAgent(ABC):
         self.action_size: int = action_size
 
     @abstractmethod
-    def choose_action(self, state: List[Union[float, int]], reward: float):
-        """Choose and return the next action.
+    def choose_action(self, state: ndarray, reward: float) -> int:
+        """
+        Choose and return the next action.
+        :param state: numpy array
+        :param reward: float as the reward value
+        :return: action type integer
         """
 
     @abstractmethod

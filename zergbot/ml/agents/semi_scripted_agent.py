@@ -1,6 +1,8 @@
 from math import floor
 from typing import List, Union
 
+from numpy.core.multiarray import ndarray
+
 from zergbot.ml.agents import BaseMLAgent
 
 
@@ -9,7 +11,7 @@ class SemiScriptedAgent(BaseMLAgent):
      at which point it creates army.
     """
 
-    def choose_action(self, state: List[Union[float, int]]):
+    def choose_action(self, state: ndarray, reward: float) -> int:
         if state[1] >= 50:
             return 1
         else:
