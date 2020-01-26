@@ -7,7 +7,7 @@ import random
 from typing import List
 import sys
 
-from dummies.debug.ml_debug_worker_rush_defender import WorkerRushDefender
+from a3c_general_agent.ml_debug_worker_rush_defender import WorkerRushDefender
 from sc2.player import AbstractPlayer, Bot, Human, Computer
 
 sys.path.insert(1, "sharpy-sc2")
@@ -198,6 +198,7 @@ enemies = {
     "debugrestorepower": (lambda params: Bot(Race.Protoss, RestorePowerDummy())),
     "debuguseneural": (lambda params: Bot(Race.Zerg, UseNeuralParasiteDummy())),
     "debugdetectneural": (lambda params: Bot(Race.Protoss, DetectNeuralParasiteDummy())),
+    "debugmlworkerrushdefender": (lambda params: Bot(Race.Zerg, WorkerRushDefender())),
 
     # Built-in computer AIs
     "ai": (lambda params: Computer(races[index_check(params, 0, "random")],

@@ -1,4 +1,5 @@
 import os
+import pickle
 from queue import Queue
 from typing import List, Union
 
@@ -7,6 +8,7 @@ import tensorflow as tf
 from tensorflow.python import keras
 from tensorflow.python.keras import layers
 
+from filelock.filelock import FileLock
 from zergbot.ml.agents import BaseMLAgent
 
 
@@ -32,12 +34,11 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    tmp = int(total_loss / float(num_steps) * 1000) / 1000
     print(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
-        f"Loss: {tmp} | "
+        f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
         f"Steps: {num_steps} | "
         f"Worker: {worker_idx}"
     )
@@ -81,6 +82,15 @@ class Memory:
         self.rewards = []
 
 
+SAVE_DIR = "./data/"
+MODEL_NAME = 'model_sc2'
+MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
+MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
+OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
+MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f'{MODEL_FILE_NAME}.lock')
+
+
 class A3CAgent(BaseMLAgent):
     # Set up global variables across different threads
     global_episode = 0
@@ -94,7 +104,21 @@ class A3CAgent(BaseMLAgent):
                  learning_rate=0.001,
                  gamma=0.99):
         super().__init__(state_size, action_size)
-        self.local_model = ActorCriticModel(self.state_size, self.action_size)
+
+        with FileLock(MODEL_FILE_LOCK_PATH):
+            if not os.path.isfile(MODEL_FILE_PATH):
+                global_model = ActorCriticModel(self.state_size, self.action_size)
+                global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+                global_model.save_weights(MODEL_FILE_PATH)
+
+                # Create saved optimizer
+                with open(OPTIMIZER_FILE_PATH, 'wb') as f:
+                    pickle.dump(tf.train.AdamOptimizer(learning_rate, use_locking=True), f)
+
+            self.local_model = ActorCriticModel(self.state_size, self.action_size)
+            self.local_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+            self.local_model.load_weights(MODEL_FILE_PATH)
+
         self.mem = Memory()
 
         self.prev_action = None
@@ -108,9 +132,6 @@ class A3CAgent(BaseMLAgent):
         self.gamma = gamma
 
         # todo: previously these were constructed in the master agent and shared among workers
-        self.opt = tf.train.AdamOptimizer(learning_rate, use_locking=True)
-        self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
-        self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
         self.result_queue = Queue()
 
         self.ep_loss = 0
@@ -138,59 +159,69 @@ class A3CAgent(BaseMLAgent):
         return self.prev_action
 
     def on_end(self, state: List[Union[float, int]], reward: float):
-        self.evaluate_prev_action_reward(reward)
-        # Calculate gradient wrt to local model. We do so by tracking the
-        # variables involved in computing the loss by using tf.GradientTape
-        with tf.GradientTape() as tape:
-            total_loss = self.compute_loss(True,
-                                           state,
-                                           self.mem,
-                                           self.gamma)
-        self.ep_loss += total_loss
-        # Calculate local gradients
-        grads = tape.gradient(total_loss, self.local_model.trainable_weights)
-        # Push local gradients to global model
-        self.opt.apply_gradients(zip(grads,
-                                     self.global_model.trainable_weights))
-        # Update local model with new weights
-        self.local_model.set_weights(self.global_model.get_weights())
+        with FileLock(MODEL_FILE_LOCK_PATH):
+            global_model = ActorCriticModel(self.state_size, self.action_size)
+            global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+            global_model.save_weights(os.path.join(SAVE_DIR, MODEL_FILE_NAME))
 
-        self.mem.clear()
-        self.time_count = 0
+            optimizer: tf.train.AdamOptimizer
+            with open(OPTIMIZER_FILE_PATH, 'rb') as f:
+                optimizer = pickle.load(f)
 
-        # if done:  # done and print information
-        # Worker.global_moving_average_reward = \
-        #     record(Worker.global_episode, self.ep_reward, 1, #self.worker_idx,
-        #            Worker.global_moving_average_reward, self.result_queue,
-        #            self.ep_loss, ep_steps)
-        A3CAgent.global_moving_average_reward = \
-            record(A3CAgent.global_episode, self.ep_reward, 1,  # self.worker_idx,
-                   A3CAgent.global_moving_average_reward, self.result_queue,
-                   self.ep_loss, self.ep_steps)
-        # We must use a lock to save our model and to print to prevent data races.
-        # if self.ep_reward > Worker.best_score:
-        if self.ep_reward > A3CAgent.best_score:
-            # with Worker.save_lock:
-            print("Saving best model to {}, "
-                  "episode score: {}".format('tmp', self.ep_reward))
-            self.global_model.save_weights(
-                os.path.join('tmp',
-                             'model_{}.h5'.format('sc2'))
-            )
-            # Worker.best_score = ep_reward
-            A3CAgent.best_score = self.ep_reward
-        # Worker.global_episode += 1
-        A3CAgent.global_episode += 1
+            # work with the file as it is now locked
+            self.evaluate_prev_action_reward(reward)
+            # Calculate gradient wrt to local model. We do so by tracking the
+            # variables involved in computing the loss by using tf.GradientTape
+            with tf.GradientTape() as tape:
+                total_loss = self.compute_loss(True,
+                                               state,
+                                               self.mem,
+                                               self.gamma)
+            self.ep_loss += total_loss
+            # Calculate local gradients
+            grads = tape.gradient(total_loss, self.local_model.trainable_weights)
+            # Push local gradients to global model
+            optimizer.apply_gradients(zip(grads,
+                                         global_model.trainable_weights))
+            # Update local model with new weights
+            self.local_model.set_weights(global_model.get_weights())
 
-        # todo: this isn't how it originally want.
-        self.prev_action = None
-        self.prev_state = None
-        self.ep_reward = 0
-        self.ep_steps = 0
-        self.time_count = 0
-        self.total_step = 0
-        self.result_queue.empty()
-        self.ep_loss = 0
+            self.mem.clear()
+            self.time_count = 0
+
+            # if done:  # done and print information
+            # Worker.global_moving_average_reward = \
+            #     record(Worker.global_episode, self.ep_reward, 1, #self.worker_idx,
+            #            Worker.global_moving_average_reward, self.result_queue,
+            #            self.ep_loss, ep_steps)
+            A3CAgent.global_moving_average_reward = \
+                record(A3CAgent.global_episode, self.ep_reward, 1,  # self.worker_idx,
+                       A3CAgent.global_moving_average_reward, self.result_queue,
+                       self.ep_loss, self.ep_steps)
+            # We must use a lock to save our model and to print to prevent data races.
+            # if self.ep_reward > Worker.best_score:
+            # if self.ep_reward > A3CAgent.best_score:
+            #     A3CAgent.best_score = self.ep_reward
+            #     print("New best score: ".format(A3CAgent.best_score))
+
+            global_model.save_weights(MODEL_FILE_PATH)
+
+            # Save optimizer weights.
+            with open(OPTIMIZER_FILE_PATH, 'wb') as f:
+                pickle.dump(optimizer, f)
+
+            # Worker.global_episode += 1
+            A3CAgent.global_episode += 1
+
+            # todo: this isn't how it originally want.
+            self.prev_action = None
+            self.prev_state = None
+            self.ep_reward = 0
+            self.ep_steps = 0
+            self.time_count = 0
+            self.total_step = 0
+            self.result_queue.empty()
+            self.ep_loss = 0
 
     def compute_loss(self,
                      done,

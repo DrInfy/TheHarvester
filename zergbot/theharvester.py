@@ -1,17 +1,11 @@
 from typing import Dict, Callable, Union
 
-import numpy as np
-
-from sc2 import UnitTypeId, Result
+from sc2 import Result
 from sharpy.knowledges import KnowledgeBot
+from sharpy.managers.roles import UnitTask
 from sharpy.plans import BuildOrder
-from sharpy.plans import Step, SequentialList
-from sharpy.plans.acts import *
-from sharpy.plans.acts.zerg import *
-from sharpy.plans.require import *
-from sharpy.plans.tactics import *
-from sharpy.plans.tactics.zerg import *
 from zergbot.builds import *
+from zergbot.builds.worker_distraction import WorkerDistraction_v0
 from zergbot.ml.agents import *
 
 agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
@@ -20,9 +14,9 @@ agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
     "scripted": lambda s, a: SemiScriptedAgent(s, a)
 }
 
-
 builds: Dict[str, Callable[[], MlBuild]] = {
-    "default": lambda: EconLings_v0()
+    "default": lambda: EconLings_v0(),
+    "workerdistraction": lambda: WorkerDistraction_v0()
 }
 
 
@@ -42,6 +36,8 @@ class HarvesterBot(KnowledgeBot):
         self.next_action = 0
         self.initialize_agent(agent, build)
 
+        self.distraction_worker_tag: int = 0
+
     def initialize_agent(self, agent: Union[str, BaseMLAgent], build_text):
         self.ml_build = builds[build_text]()
 
@@ -57,20 +53,30 @@ class HarvesterBot(KnowledgeBot):
         return self.ml_build
 
     async def on_step(self, iteration):
-        self.ml_build.action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army], 0)
 
-        # todo: turn off for ladder.
-        if self.ml_build.action == 0:
-            self.client.debug_text_screen("ECON", (0.01, 0.01), (0, 255, 0), 16)
+        action = self.agent.choose_action(self.ml_build.state, 0)
+        if self.ml_build.state[1]:  # if scouting worker is alive
+            distraction_worker = self.workers.by_tag(self.distraction_worker_tag)
+            if action == 0:
+                self.do(distraction_worker.attack(self.enemy_start_locations[0]))
+                self.client.debug_text_screen("ATTACK", (0.01, 0.01), (255, 0, 0), 16)
+            else:
+                self.do(distraction_worker.move(self.start_location))
+                self.client.debug_text_screen("RETREAT", (0.01, 0.01), (0, 255, 0), 16)
         else:
-            self.client.debug_text_screen("ARMY", (0.01, 0.01), (255, 0, 0), 16)
+            self.client.debug_text_screen("DEAD", (0.01, 0.01), (255, 255, 255), 16)
 
-        if not self.conceded and self.knowledge.game_analyzer.bean_predicting_defeat_for > 5:
-            await self.chat_send("pineapple")
-            self.conceded = True
+
         return await super().on_step(iteration)
 
     async def on_end(self, game_result: Result):
         self.ml_build.on_end(game_result)
         self.agent.on_end([self.time, self.supply_workers, self.supply_army], self.ml_build.reward)
         await super().on_end(game_result)
+
+    async def on_start(self):
+        await super().on_start()
+
+        distraction_worker = self.workers.closest_to(self.enemy_start_locations[0])
+        self.knowledge.roles.set_task(UnitTask.Scouting, distraction_worker)
+        self.distraction_worker_tag = distraction_worker.tag

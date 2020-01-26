@@ -13,8 +13,9 @@ class Sc2Env:
     Environment that simulates what gym has for instant replacement
     Should look similar to gym env in structure: https://github.com/openai/gym/blob/master/gym/core.py
     """
-    def __init__(self, bot_name: str, game_map: str, opponent: str, agent: A3CAgent):
+    def __init__(self, bot_name: str, game_map: str, opponent: str, agent: A3CAgent, agent_build: str):
         self.agent = agent
+        self.agent_build = agent_build
         self.opponent = opponent
         self.game_map = game_map
         self.bot_name = bot_name
@@ -22,10 +23,10 @@ class Sc2Env:
 
     def run(self):
         try:
-            bot1 = Bot(Race.Zerg, HarvesterBot(self.agent))
+            bot1 = Bot(Race.Zerg, HarvesterBot(self.agent, self.agent_build))
             # TODO: make a version of setup_game that calls manually _host_game instead
             # TODO: currently it runs the whole game, it doesn't just set it up
-            setup_game(True, False, bot1, self.bot_name, 'ai.terran.medium.timing', self.game_map)
+            setup_game(True, False, bot1, self.bot_name, self.opponent, self.game_map)
         except KeyboardInterrupt:
             print("Received Keyboard Interrupt. Shutting down.")
         finally:
