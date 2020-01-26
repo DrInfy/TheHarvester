@@ -19,8 +19,8 @@ class MlBuild(BuildOrder):
         self.action: int = 0
         super().__init__(orders)
 
-    @abstractmethod
     @property
+    @abstractmethod
     def state(self) -> List[int]:
         pass
 

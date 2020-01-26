@@ -1,5 +1,7 @@
 from typing import Dict, Callable, Union
 
+import numpy as np
+
 from sc2 import UnitTypeId, Result
 from sharpy.knowledges import KnowledgeBot
 from sharpy.plans import BuildOrder
@@ -31,7 +33,7 @@ class HarvesterBot(KnowledgeBot):
     def __init__(self, agent: Union[str, BaseMLAgent] = "random", build: str = "default"):
         super().__init__("Harvester")
         self.agent = agent
-        if build not in agents:
+        if build not in builds:
             raise ValueError(f'{build} does not exist')
         self.build_text = build
         self.distribute = None
@@ -55,10 +57,10 @@ class HarvesterBot(KnowledgeBot):
         return self.ml_build
 
     async def on_step(self, iteration):
-        self.next_action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army])
+        self.ml_build.action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army], 0)
 
         # todo: turn off for ladder.
-        if self.next_action == 0:
+        if self.ml_build.action == 0:
             self.client.debug_text_screen("ECON", (0.01, 0.01), (0, 255, 0), 16)
         else:
             self.client.debug_text_screen("ARMY", (0.01, 0.01), (255, 0, 0), 16)
@@ -70,4 +72,5 @@ class HarvesterBot(KnowledgeBot):
 
     async def on_end(self, game_result: Result):
         self.ml_build.on_end(game_result)
+        self.agent.on_end([self.time, self.supply_workers, self.supply_army], self.ml_build.reward)
         await super().on_end(game_result)
