@@ -10,7 +10,7 @@ import platform
 
 STOP_FILE: str = "runner-stop.txt"
 
-TRAINIG_SCRIPT = "./train.py"
+TRAINING_SCRIPT = "./train.py"
 
 if __name__ == '__main__':
     if os.path.isfile(STOP_FILE):
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     else:
         cmd = "python.exe"
 
-    processes = [subprocess.Popen([cmd, TRAINIG_SCRIPT])
+    processes = [subprocess.Popen([cmd, TRAINING_SCRIPT])
                  for i in range(10)]
     run_games = True
 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
         for index, p in enumerate(processes):
             if p.poll() is not None:
                 # new processes
-                processes[index] = subprocess.Popen(["python.exe", TRAINIG_SCRIPT])
+                processes[index] = subprocess.Popen(["python.exe", TRAINING_SCRIPT])
                 time.sleep(3)  # This is to prevent sc2 from crashing on launch.
 
 
