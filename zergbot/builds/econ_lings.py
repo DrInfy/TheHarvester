@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Tuple
 
 from sc2 import UnitTypeId
 from sharpy.plans import BuildOrder
@@ -9,15 +9,31 @@ from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
 from zergbot.builds.ml_build import MlBuild
+from zergbot.ml.agents import BaseMLAgent
 
 
 class EconLings_v0(MlBuild):
 
-    def __init__(self):
-        super().__init__(4, 2, self.create_plan())
+    def __init__(self, agent: BaseMLAgent):
+        super().__init__(agent, 4, 2, self.create_plan())
 
-    def state(self) -> List[int]:
+    def state(self) -> List[Union[int, float]]:
         return [self.ai.time, self.ai.supply_workers, self.ai.supply_army, self.ai.minerals]
+
+    def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
+        if self.next_action == 0:
+            return ("ECON", (0, 255, 0))
+        return ("ARMY", (255, 0, 0))
+
+    async def execute(self) -> bool:
+        self.next_action = self.agent.choose_action([self.time, self.supply_workers, self.supply_army])
+
+        # todo: turn off for ladder.
+        if self.next_action == 0:
+            self.client.debug_text_screen("ECON", (0.01, 0.01), (0, 255, 0), 16)
+        else:
+            self.client.debug_text_screen("ARMY", (0.01, 0.01), (255, 0, 0), 16)
+        return await super().execute()
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
         economy = Step(lambda k: self.action == 0, SequentialList([
