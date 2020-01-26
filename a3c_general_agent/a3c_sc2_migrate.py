@@ -46,7 +46,7 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    logger.debug(
+    logger.info(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
