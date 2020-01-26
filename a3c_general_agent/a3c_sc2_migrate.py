@@ -1,6 +1,6 @@
+import logging
 import os
 import pickle
-from queue import Queue
 from typing import List, Union
 
 import numpy as np
@@ -10,6 +10,20 @@ from tensorflow.python.keras import layers
 
 from filelock.filelock import FileLock
 from zergbot.ml.agents import BaseMLAgent
+
+logger = logging.getLogger(__name__)
+
+SAVE_DIR = "./data/"
+MODEL_NAME = 'model_sc2'
+MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
+MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
+OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
+MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f'{MODEL_FILE_NAME}.lock')
+GLOBAL_RECORDS_FILE_NAME = f'{MODEL_NAME}.records.pkl'
+GLOBAL_RECORDS_FILE_PATH = os.path.join(SAVE_DIR, GLOBAL_RECORDS_FILE_NAME)
+LOG_FILE_NAME = f'{MODEL_NAME}.log'
+LOG_FILE_PATH = os.path.join(SAVE_DIR, LOG_FILE_NAME)
 
 
 def record(episode,
@@ -32,7 +46,7 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    print(
+    logger.debug(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
@@ -77,17 +91,6 @@ class Memory:
         self.states = []
         self.actions = []
         self.rewards = []
-
-
-SAVE_DIR = "./data/"
-MODEL_NAME = 'model_sc2'
-MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
-MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
-OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
-OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
-MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f'{MODEL_FILE_NAME}.lock')
-GLOBAL_RECORDS_FILE_NAME = f'{MODEL_NAME}.records.pkl'
-GLOBAL_RECORDS_FILE_PATH = os.path.join(SAVE_DIR, GLOBAL_RECORDS_FILE_NAME)
 
 
 class A3CAgent(BaseMLAgent):
@@ -190,7 +193,7 @@ class A3CAgent(BaseMLAgent):
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
             # Push local gradients to global model
             optimizer.apply_gradients(zip(grads,
-                                         global_model.trainable_weights))
+                                          global_model.trainable_weights))
             # Update local model with new weights
             self.local_model.set_weights(global_model.get_weights())
 
