@@ -33,7 +33,9 @@ class EconLings_v0(MlBuild):
 
     @property
     def score(self) -> float:
-        return super().score - min(0, self.ai.minerals - 400) / 1000.0
+        value = self.knowledge.enemy_army_predicter.own_army_value_minerals + \
+            self.knowledge.enemy_army_predicter.own_army_value_gas
+        return super().score - min(0, self.ai.minerals - 400) / 1000.0 + value / 1000.0
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
         economy = Step(lambda k: self.action == 0, SequentialList([
@@ -44,12 +46,13 @@ class EconLings_v0(MlBuild):
             ZergUnit(UnitTypeId.DRONE, 38),
             ActExpand(4),
             ZergUnit(UnitTypeId.DRONE, 50),
+            ActExpand(5),
         ]))
 
         units = Step(lambda k: self.action == 1, SequentialList([
             ActBuilding(UnitTypeId.SPAWNINGPOOL),
             BuildOrder([
-                Step(RequiredMinerals(500), ActExpand(4)),
+                # Step(RequiredMinerals(500), ActExpand(4)),
                 Step(None, ZergUnit(UnitTypeId.QUEEN, 5), skip_until=lambda k: k.ai.minerals > 150),
                 ZergUnit(UnitTypeId.ZERGLING, 400),
             ])
