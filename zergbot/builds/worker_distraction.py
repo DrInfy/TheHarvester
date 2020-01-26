@@ -53,9 +53,9 @@ class WorkerDistraction_v0(MlBuild):
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
         if self.is_dead:
             return "DEAD", (255, 255, 255)
-        if action == 0:
-            return ("ATTACK", (255, 0, 0))
         if action == 1:
+            return ("ATTACK", (255, 0, 0))
+        if action == 0:
             return ("RETREAT", (0, 255, 0))
 
         return super().get_action_name_color(action)
