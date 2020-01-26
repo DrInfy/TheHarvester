@@ -34,6 +34,13 @@ class WorkerDistraction_v0(MlBuild):
         # except KeyError:
         #     return [False, 0]
 
+    @property
+    def score(self) -> float:
+        # enemy workers not mining
+        not_mining_count = len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).filter(lambda unit: unit.is_attacking))
+        self.reward = not_mining_count-len(self.distraction_worker_tags)
+        return self.reward
+
     async def start(self, knowledge: 'Knowledge'):
         await super().start(knowledge)
         distraction_workers = self.ai.workers.closest_n_units(self.ai.enemy_start_locations[0], num_distraction_workers)
