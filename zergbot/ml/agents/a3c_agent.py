@@ -174,7 +174,7 @@ class A3CAgent(BaseMLAgent):
         with FileLock(self.MODEL_FILE_LOCK_PATH):
             global_model = ActorCriticModel(self.state_size, self.action_size)
             global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-            global_model.save_weights(os.path.join(SAVE_DIR, self.MODEL_FILE_NAME))
+            global_model.load_weights(self.MODEL_FILE_PATH)
 
             optimizer: tf.train.AdamOptimizer
             with open(self.OPTIMIZER_FILE_PATH, 'rb') as f:
