@@ -12,6 +12,8 @@ import tensorflow as tf
 from zergbot.ml.environments.sc2_env import Sc2Env
 from zergbot.ml.environments.cartpole_env import CartPoleEnv
 
+STOP_FILE: str = "runner-stop.txt"
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Run bot games"
@@ -22,6 +24,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = ""  # use CPU??
     tf.enable_eager_execution()
     with tf.device('/cpu:0'):  # use CPU instead of GPU
+
         if args.env == "workerdistraction":
             env = Sc2Env("test_bot.workerdistraction",
                          "AbyssalReefLE",
@@ -38,4 +41,8 @@ if __name__ == '__main__':
         elif args.env == "cartpole":
             agent: BaseMLAgent = A3CAgent(args.env, 4, 2)
             env = CartPoleEnv(agent.choose_action, agent.on_end)
-        env.run()
+        while not os.path.isfile(STOP_FILE):
+
+            env.run()
+
+        exit()  # for some reason pycharm hangs in the python process without this?

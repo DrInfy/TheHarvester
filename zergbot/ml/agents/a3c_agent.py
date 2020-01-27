@@ -115,25 +115,31 @@ class A3CAgent(BaseMLAgent):
 
         with FileLock(self.MODEL_FILE_LOCK_PATH):
             if not os.path.isfile(self.MODEL_FILE_PATH):
-                global_model = ActorCriticModel(self.state_size, self.action_size)
-                global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-                global_model.save_weights(self.MODEL_FILE_PATH)
+                self.global_model = ActorCriticModel(self.state_size, self.action_size)
+                self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+                self.global_model.save_weights(self.MODEL_FILE_PATH)
 
                 # Create saved optimizer
-                with open(self.OPTIMIZER_FILE_PATH, 'wb') as f:
-                    pickle.dump(tf.train.AdamOptimizer(learning_rate, use_locking=True), f)
+                # with open(self.OPTIMIZER_FILE_PATH, 'wb') as f:
+                #     pickle.dump(tf.train.AdamOptimizer(learning_rate, use_locking=True), f)
+                self.optimizer = tf.train.AdamOptimizer(learning_rate, use_locking=True)
 
                 # Create saved global records
-                with open(self.GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
-                    global_records = {
-                        'global_episode': 1,
-                        'global_moving_average_reward': 0,
-                    }
-                    pickle.dump(global_records, f)
+                # with open(self.GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
+                #     global_records = {
+                #         'global_episode': 1,
+                #         'global_moving_average_reward': 0,
+                #     }
+                #     pickle.dump(global_records, f)
+                self.global_records = {
+                    'global_episode': 1,
+                    'global_moving_average_reward': 0,
+                }
 
             self.local_model = ActorCriticModel(self.state_size, self.action_size)
             self.local_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-            self.local_model.load_weights(self.MODEL_FILE_PATH)
+            # self.local_model.load_weights(self.MODEL_FILE_PATH)
+            # self.local_model.set_weights(self.global_model.get_weights())
 
         self.mem = Memory()
 
@@ -172,17 +178,17 @@ class A3CAgent(BaseMLAgent):
 
     def on_end(self, state: List[Union[float, int]], reward: float):
         with FileLock(self.MODEL_FILE_LOCK_PATH):
-            global_model = ActorCriticModel(self.state_size, self.action_size)
-            global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-            global_model.save_weights(os.path.join(SAVE_DIR, self.MODEL_FILE_NAME))
+            # self.global_model = ActorCriticModel(self.state_size, self.action_size)
+            # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+            # self.global_model.save_weights(os.path.join(SAVE_DIR, self.MODEL_FILE_NAME))
 
-            optimizer: tf.train.AdamOptimizer
-            with open(self.OPTIMIZER_FILE_PATH, 'rb') as f:
-                optimizer = pickle.load(f)
+            # optimizer: tf.train.AdamOptimizer
+            # with open(self.OPTIMIZER_FILE_PATH, 'rb') as f:
+            #     optimizer = pickle.load(f)
 
-            global_records: dict
-            with open(self.GLOBAL_RECORDS_FILE_PATH, 'rb') as f:
-                global_records = pickle.load(f)
+            # global_records: dict
+            # with open(self.GLOBAL_RECORDS_FILE_PATH, 'rb') as f:
+            #     global_records = pickle.load(f)
 
             # work with the file as it is now locked
             self.evaluate_prev_action_reward(reward)
@@ -197,41 +203,37 @@ class A3CAgent(BaseMLAgent):
             # Calculate local gradients
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
             # Push local gradients to global model
-            optimizer.apply_gradients(zip(grads,
-                                          global_model.trainable_weights))
+            self.optimizer.apply_gradients(zip(grads,
+                                          self.global_model.trainable_weights))
             # Update local model with new weights
-            self.local_model.set_weights(global_model.get_weights())
+            self.local_model.set_weights(self.global_model.get_weights())
 
             self.mem.clear()
             self.time_count = 0
 
-            # if done:  # done and print information
-            # Worker.global_moving_average_reward = \
-            #     record(Worker.global_episode, self.ep_reward, 1, #self.worker_idx,
-            #            Worker.global_moving_average_reward, self.result_queue,
-            #            self.ep_loss, ep_steps)
-            global_records['global_moving_average_reward'] = \
-                record(global_records['global_episode'], self.ep_reward, 1,  # self.worker_idx,
-                       global_records['global_moving_average_reward'],
-                       self.ep_loss, self.ep_steps)
-            # We must use a lock to save our model and to print to prevent data races.
-            # if self.ep_reward > Worker.best_score:
-            # if self.ep_reward > A3CAgent.best_score:
-            #     A3CAgent.best_score = self.ep_reward
-            #     print("New best score: ".format(A3CAgent.best_score))
 
-            global_model.save_weights(self.MODEL_FILE_PATH)
+            # global_records['global_moving_average_reward'] = \
+            #     record(global_records['global_episode'], self.ep_reward, 1,  # self.worker_idx,
+            #            global_records['global_moving_average_reward'],
+            #            self.ep_loss, self.ep_steps)
+
+            self.global_records['global_moving_average_reward'] = \
+                record(self.global_records['global_episode'], self.ep_reward, 1,  # self.worker_idx,
+                       self.global_records['global_moving_average_reward'],
+                       self.ep_loss, self.ep_steps)
+
+            # self.global_model.save_weights(self.MODEL_FILE_PATH)
 
             # Save optimizer weights.
-            with open(self.OPTIMIZER_FILE_PATH, 'wb') as f:
-                pickle.dump(optimizer, f)
+            # with open(self.OPTIMIZER_FILE_PATH, 'wb') as f:
+            #     pickle.dump(optimizer, f)
 
             # Worker.global_episode += 1
-            global_records['global_episode'] += 1
+            self.global_records['global_episode'] += 1
 
             # Save global records
-            with open(self.GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
-                pickle.dump(global_records, f)
+            # with open(self.GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
+            #     pickle.dump(global_records, f)
 
             # todo: this isn't how it originally was.
             self.prev_action = None
