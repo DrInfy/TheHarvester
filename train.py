@@ -12,6 +12,8 @@ import tensorflow as tf
 from zergbot.ml.environments.sc2_env import Sc2Env
 from zergbot.ml.environments.cartpole_env import CartPoleEnv
 
+STOP_FILE: str = "runner-stop.txt"
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description="Run bot games"
@@ -22,20 +24,22 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = ""  # use CPU??
     tf.enable_eager_execution()
     with tf.device('/cpu:0'):  # use CPU instead of GPU
-        if args.env == "workerdistraction":
-            env = Sc2Env("test_bot.workerdistraction",
-                         "AbyssalReefLE",
-                         "debugmlworkerrushdefender",
-                         "learning",
-                         "workerdistraction")
-        elif args.env == "harvester":
-            env = Sc2Env("test_bot.default",
-                         "AbyssalReefLE",
-                         "harvester",
-                         "learning",
-                         "default")
+        while not os.path.isfile(STOP_FILE):
+            if args.env == "workerdistraction":
+                env = Sc2Env("test_bot.workerdistraction",
+                             "AbyssalReefLE",
+                             "debugmlworkerrushdefender",
+                             "learning",
+                             "workerdistraction")
+            elif args.env == "harvester":
+                env = Sc2Env("test_bot.default",
+                             "AbyssalReefLE",
+                             "harvester",
+                             "learning",
+                             "default")
 
-        elif args.env == "cartpole":
-            agent: BaseMLAgent = A3CAgent(args.env, 4, 2)
-            env = CartPoleEnv(agent.choose_action, agent.on_end)
-        env.run()
+            elif args.env == "cartpole":
+                agent: BaseMLAgent = A3CAgent(args.env, 4, 2)
+                env = CartPoleEnv(agent.choose_action, agent.on_end)
+
+            env.run()
