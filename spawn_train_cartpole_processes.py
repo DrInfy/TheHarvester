@@ -30,10 +30,10 @@ if __name__ == '__main__':
             if p.poll() is not None:
                 # new processes
                 processes[index] = subprocess.Popen(start_cmds)
-                time.sleep(3)  # This is to prevent sc2 from crashing on launch.
+                time.sleep(0.3)  # This is to prevent sc2 from crashing on launch.
 
 
-        time.sleep(1)
+        time.sleep(0.1)
         if os.path.isfile(STOP_FILE):
             print(f"Exiting runner... {STOP_FILE} found.")
             run_games = False
@@ -45,4 +45,4 @@ if __name__ == '__main__':
                     if p.poll() is None:
                         running_game = True
 
-                time.sleep(1)
+                time.sleep(0.1)
