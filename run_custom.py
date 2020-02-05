@@ -7,11 +7,12 @@ import random
 from typing import List
 import sys
 
-from sc2.player import AbstractPlayer, Bot, Human, Computer
 
 sys.path.insert(1, "sharpy-sc2")
 sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
+from sc2.player import AbstractPlayer, Bot, Human, Computer
+from a3c_general_agent.ml_debug_worker_rush_defender import WorkerRushDefender
 from sharpy.knowledges import KnowledgeBot
 import sc2
 from config import get_config
@@ -118,7 +119,8 @@ def setup_game(release, real_time, bot: AbstractPlayer, bot_text: str, enemy_tex
     if not os.path.isdir(folder):
         os.mkdir(folder)
     time = datetime.datetime.now().strftime('%Y-%m-%d %H_%M_%S')
-    file_name = f'{enemy_text}_{map_name}_{time}'
+    randomizer = random.randint(0, 999999)
+    file_name = f'{enemy_text}_{map_name}_{time}_{randomizer}'
     path = f'{folder}/{file_name}.log'
     handler = logging.FileHandler(path)
     root_logger.addHandler(handler)
@@ -155,7 +157,7 @@ enemies = {
 
     # Dynamic bots
     "harvester": (lambda params:
-              Bot(Race.Zerg, HarvesterBot(index_check(params, 0, "default")))),
+              Bot(Race.Zerg, HarvesterBot(index_check(params, 0, "random"), (index_check(params, 1, "default"))))),
 
     # Protoss
     "adept": (lambda params: Bot(Race.Protoss, AdeptRush())),
@@ -176,7 +178,7 @@ enemies = {
     "lingflood": (lambda params: Bot(Race.Zerg, LingFlood(False))),
     "lingspeed": (lambda params: Bot(Race.Zerg, LingFlood(True))),
     "workerrush": (lambda params: Bot(Race.Zerg, WorkerRush())),
-    "hydra":(lambda params: Bot(Race.Zerg, RoachHydra())),
+    "hydra": (lambda params: Bot(Race.Zerg, RoachHydra())),
     "mutalisk": (lambda params: Bot(Race.Zerg, MutaliskBot())),
     "spine": (lambda params: Bot(Race.Zerg, SpineDefender())),
     "randomzerg": (lambda params: Bot(Race.Zerg, RandomZergBot())),
@@ -197,6 +199,7 @@ enemies = {
     "debugrestorepower": (lambda params: Bot(Race.Protoss, RestorePowerDummy())),
     "debuguseneural": (lambda params: Bot(Race.Zerg, UseNeuralParasiteDummy())),
     "debugdetectneural": (lambda params: Bot(Race.Protoss, DetectNeuralParasiteDummy())),
+    "debugmlworkerrushdefender": (lambda params: Bot(Race.Zerg, WorkerRushDefender())),
 
     # Built-in computer AIs
     "ai": (lambda params: Computer(races[index_check(params, 0, "random")],
