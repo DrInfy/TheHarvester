@@ -15,7 +15,7 @@ from zergbot.ml.agents import BaseMLAgent
 class EconLings_v0(MlBuild):
 
     def __init__(self):
-        super().__init__(8, 2, self.create_plan())
+        super().__init__(8, 2, self.create_plan(), result_multiplier=10000)
 
     @property
     def state(self) -> List[Union[int, float]]:
@@ -33,9 +33,13 @@ class EconLings_v0(MlBuild):
 
     @property
     def score(self) -> float:
-        value = self.knowledge.enemy_army_predicter.own_army_value_minerals + \
-            self.knowledge.enemy_army_predicter.own_army_value_gas
-        return super().score - min(0, self.ai.minerals - 400) / 1000.0 + value / 1000.0
+        # self.reward = 0
+        # self.reward -= min(0, self.ai.minerals - 400) / 1000.0
+        # self.reward += self.knowledge.income_calculator.mineral_income / 100
+        return self.reward
+        # value = self.knowledge.enemy_army_predicter.own_army_value_minerals + \
+        #     self.knowledge.enemy_army_predicter.own_army_value_gas
+        # return super().score - min(0, self.ai.minerals - 400) / 1000.0 + value / 1000.0
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
         economy = Step(lambda k: self.action == 0, SequentialList([

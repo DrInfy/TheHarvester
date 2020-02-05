@@ -7,12 +7,12 @@ import random
 from typing import List
 import sys
 
-from a3c_general_agent.ml_debug_worker_rush_defender import WorkerRushDefender
-from sc2.player import AbstractPlayer, Bot, Human, Computer
 
 sys.path.insert(1, "sharpy-sc2")
 sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
+from sc2.player import AbstractPlayer, Bot, Human, Computer
+from a3c_general_agent.ml_debug_worker_rush_defender import WorkerRushDefender
 from sharpy.knowledges import KnowledgeBot
 import sc2
 from config import get_config

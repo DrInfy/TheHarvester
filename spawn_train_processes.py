@@ -21,15 +21,15 @@ if __name__ == '__main__':
     else:
         cmd = "python.exe"
 
-    processes = [subprocess.Popen([cmd, TRAINING_SCRIPT])
-                 for i in range(10)]
+    processes = [time.sleep(3) or subprocess.Popen([cmd, TRAINING_SCRIPT, "-env", "harvester"])
+                 for i in range(14)]
     run_games = True
 
     while run_games:
         for index, p in enumerate(processes):
             if p.poll() is not None:
                 # new processes
-                processes[index] = subprocess.Popen(["python.exe", TRAINING_SCRIPT])
+                processes[index] = subprocess.Popen([cmd, TRAINING_SCRIPT, "-env", "harvester"])
                 time.sleep(3)  # This is to prevent sc2 from crashing on launch.
 
 
