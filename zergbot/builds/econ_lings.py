@@ -31,12 +31,12 @@ class EconLings_v0(MlBuild):
             return ("ECON", (0, 255, 0))
         return ("ARMY", (255, 0, 0))
 
-    @property
-    def score(self) -> float:
+    # @property
+    # def score(self) -> float:
         # self.reward = 0
         # self.reward -= min(0, self.ai.minerals - 400) / 1000.0
         # self.reward += self.knowledge.income_calculator.mineral_income / 100
-        return self.reward
+        # return self.reward
         # value = self.knowledge.enemy_army_predicter.own_army_value_minerals + \
         #     self.knowledge.enemy_army_predicter.own_army_value_gas
         # return super().score - min(0, self.ai.minerals - 400) / 1000.0 + value / 1000.0
