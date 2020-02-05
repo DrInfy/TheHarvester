@@ -16,3 +16,6 @@ class SemiScriptedAgent(BaseMLAgent):
             return 1
         else:
             return floor(state[0] / 90) % 2
+
+    def on_end(self, state: List[Union[float, int]], reward: float):
+        pass
