@@ -21,7 +21,7 @@ if __name__ == '__main__':
     else:
         cmd = "python.exe"
     start_cmds = [cmd, TRAINING_SCRIPT, "-env", "cartpole"]
-    processes = [subprocess.Popen(start_cmds)
+    processes = [subprocess.Popen(start_cmds + ["-inst", str(i)])
                  for i in range(15)]
     run_games = True
 

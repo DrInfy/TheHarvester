@@ -40,7 +40,7 @@ class WorkerRushDefender(KnowledgeBot):
 
     async def on_step(self, iteration):
         await super().on_step(iteration)
-        if self.enemy_units.closer_than(10, self.townhalls[0].position):
+        if len(self.townhalls) > 0 and self.enemy_units.closer_than(10, self.townhalls[0].position):
             for worker in self.workers:
                 self.knowledge.roles.set_task(UnitTask.Attacking, worker)
         else:

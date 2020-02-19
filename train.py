@@ -18,18 +18,25 @@ if __name__ == '__main__':
         description="Run bot games"
     )
     parser.add_argument("-env", help=f"Environment name (workerdistraction, harvester, cartpole).", default="workerdistraction")
+    parser.add_argument("-inst", help=f"The id assigned to this training instance.", default=0)
+    parser.add_argument('-train', help=f"Whether to train the agent. If this is False the agent plays instead.", default=True)
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = ""  # use CPU??
     tf.enable_eager_execution()
     with tf.device('/cpu:0'):  # use CPU instead of GPU
         while not os.path.isfile(STOP_FILE):
+            # try
+            # https://github.com/Dentosal/python-sc2/blob/master/examples/fastreload.py
+            # or
+            # https://github.com/Dentosal/python-sc2/blob/master/examples/host_external_norestart.py
             if args.env == "workerdistraction":
                 env = Sc2Env("test_bot.workerdistraction",
                              "AbyssalReefLE",
                              "debugmlworkerrushdefender",
                              "learning",
-                             "workerdistraction")
+                             "workerdistraction",
+                             train=args.train)
             elif args.env == "harvester":
                 env = Sc2Env("test_bot.default",
                              "AbyssalReefLE",
@@ -43,3 +50,8 @@ if __name__ == '__main__':
                 env = CartPoleEnv(agent.choose_action, agent.on_end)
 
             env.run()
+
+            if not args.train:
+                break
+
+    # exit()  # for some reason pycharm hangs in the python process without this?

@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+from enum import Enum
 from typing import List, Union
 
 import numpy as np
@@ -44,7 +45,7 @@ def record(episode,
         f"Episode Reward: {int(episode_reward)} | "
         f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
         f"Steps: {num_steps} | "
-        f"Worker: {worker_idx}"
+        f"Instance: {worker_idx}"
     )
     return global_ep_reward
 
@@ -97,7 +98,9 @@ class A3CAgent(BaseMLAgent):
                  state_size,
                  action_size,
                  learning_rate=0.001,
-                 gamma=0.99):
+                 gamma=0.99,
+                 trainer_instance=0,
+                 train_mode=True):
         super().__init__(state_size, action_size)
 
         assert env_name is not str
@@ -113,7 +116,10 @@ class A3CAgent(BaseMLAgent):
         self.LOG_FILE_NAME = f'{self.MODEL_NAME}.log'
         self.LOG_FILE_PATH = os.path.join(SAVE_DIR, self.LOG_FILE_NAME)
 
-        with FileLock(self.MODEL_FILE_LOCK_PATH):
+        self.instance_id = trainer_instance
+        self.train_mode: bool = train_mode
+
+        with FileLock(self.MODEL_FILE_LOCK_PATH, timeout=10000):
             if not os.path.isfile(self.MODEL_FILE_PATH):
                 global_model = ActorCriticModel(self.state_size, self.action_size)
                 global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
@@ -162,8 +168,12 @@ class A3CAgent(BaseMLAgent):
         logits, _ = self.local_model(
             tf.convert_to_tensor(state[None, :],
                                  dtype=tf.float32))
+
         probs = tf.nn.softmax(logits)
-        self.prev_action = np.random.choice(self.action_size, p=probs.numpy()[0])
+        if self.train_mode:
+            self.prev_action = np.random.choice(self.action_size, p=probs.numpy()[0])
+        else:
+            self.prev_action = np.argmax(probs)
         self.prev_state = state
 
         self.ep_steps += 1
@@ -171,67 +181,68 @@ class A3CAgent(BaseMLAgent):
         return self.prev_action
 
     def on_end(self, state: List[Union[float, int]], reward: float):
-        with FileLock(self.MODEL_FILE_LOCK_PATH):
-            global_model = ActorCriticModel(self.state_size, self.action_size)
-            global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-            global_model.load_weights(self.MODEL_FILE_PATH)
+        if self.train_mode:
+            with FileLock(self.MODEL_FILE_LOCK_PATH, timeout=10000):
+                global_model = ActorCriticModel(self.state_size, self.action_size)
+                global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+                global_model.load_weights(self.MODEL_FILE_PATH)
 
-            optimizer: tf.train.AdamOptimizer
-            with open(self.OPTIMIZER_FILE_PATH, 'rb') as f:
-                optimizer = pickle.load(f)
+                optimizer: tf.train.AdamOptimizer
+                with open(self.OPTIMIZER_FILE_PATH, 'rb') as f:
+                    optimizer = pickle.load(f)
 
-            global_records: dict
-            with open(self.GLOBAL_RECORDS_FILE_PATH, 'rb') as f:
-                global_records = pickle.load(f)
+                global_records: dict
+                with open(self.GLOBAL_RECORDS_FILE_PATH, 'rb') as f:
+                    global_records = pickle.load(f)
 
-            # work with the file as it is now locked
-            self.evaluate_prev_action_reward(reward)
-            # Calculate gradient wrt to local model. We do so by tracking the
-            # variables involved in computing the loss by using tf.GradientTape
-            with tf.GradientTape() as tape:
-                total_loss = self.compute_loss(True,
-                                               state,
-                                               self.mem,
-                                               self.gamma)
-            self.ep_loss += total_loss
-            # Calculate local gradients
-            grads = tape.gradient(total_loss, self.local_model.trainable_weights)
-            # Push local gradients to global model
-            optimizer.apply_gradients(zip(grads,
-                                          global_model.trainable_weights))
-            # Update local model with new weights
-            self.local_model.set_weights(global_model.get_weights())
+                # work with the file as it is now locked
+                self.evaluate_prev_action_reward(reward)
+                # Calculate gradient wrt to local model. We do so by tracking the
+                # variables involved in computing the loss by using tf.GradientTape
+                with tf.GradientTape() as tape:
+                    total_loss = self.compute_loss(True,
+                                                   state,
+                                                   self.mem,
+                                                   self.gamma)
+                self.ep_loss += total_loss
+                # Calculate local gradients
+                grads = tape.gradient(total_loss, self.local_model.trainable_weights)
+                # Push local gradients to global model
+                optimizer.apply_gradients(zip(grads,
+                                              global_model.trainable_weights))
+                # Update local model with new weights
+                self.local_model.set_weights(global_model.get_weights())
 
-            self.mem.clear()
-            self.time_count = 0
+                self.mem.clear()
+                self.time_count = 0
 
-            # if done:  # done and print information
-            # Worker.global_moving_average_reward = \
-            #     record(Worker.global_episode, self.ep_reward, 1, #self.worker_idx,
-            #            Worker.global_moving_average_reward, self.result_queue,
-            #            self.ep_loss, ep_steps)
-            global_records['global_moving_average_reward'] = \
-                record(global_records['global_episode'], self.ep_reward, 1,  # self.worker_idx,
-                       global_records['global_moving_average_reward'],
-                       self.ep_loss, self.ep_steps)
-            # We must use a lock to save our model and to print to prevent data races.
-            # if self.ep_reward > Worker.best_score:
-            # if self.ep_reward > A3CAgent.best_score:
-            #     A3CAgent.best_score = self.ep_reward
-            #     print("New best score: ".format(A3CAgent.best_score))
+                # if done:  # done and print information
+                # Worker.global_moving_average_reward = \
+                #     record(Worker.global_episode, self.ep_reward, 1, #self.worker_idx,
+                #            Worker.global_moving_average_reward, self.result_queue,
+                #            self.ep_loss, ep_steps)
+                global_records['global_moving_average_reward'] = \
+                    record(global_records['global_episode'], self.ep_reward, self.instance_id,
+                           global_records['global_moving_average_reward'],
+                           self.ep_loss, self.ep_steps)
+                # We must use a lock to save our model and to print to prevent data races.
+                # if self.ep_reward > Worker.best_score:
+                # if self.ep_reward > A3CAgent.best_score:
+                #     A3CAgent.best_score = self.ep_reward
+                #     print("New best score: ".format(A3CAgent.best_score))
 
-            global_model.save_weights(self.MODEL_FILE_PATH)
+                global_model.save_weights(self.MODEL_FILE_PATH)
 
-            # Save optimizer weights.
-            with open(self.OPTIMIZER_FILE_PATH, 'wb') as f:
-                pickle.dump(optimizer, f)
+                # Save optimizer weights.
+                with open(self.OPTIMIZER_FILE_PATH, 'wb') as f:
+                    pickle.dump(optimizer, f)
 
-            # Worker.global_episode += 1
-            global_records['global_episode'] += 1
+                # Worker.global_episode += 1
+                global_records['global_episode'] += 1
 
-            # Save global records
-            with open(self.GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
-                pickle.dump(global_records, f)
+                # Save global records
+                with open(self.GLOBAL_RECORDS_FILE_PATH, 'wb') as f:
+                    pickle.dump(global_records, f)
 
             # todo: this isn't how it originally was.
             self.prev_action = None

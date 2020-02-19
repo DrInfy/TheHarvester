@@ -9,9 +9,9 @@ from zergbot.builds.worker_distraction import WorkerDistraction_v0
 from zergbot.ml.agents import *
 
 agents: Dict[str, Callable[[int, int], BaseMLAgent]] = {
-    "learning": lambda env_name, s, a: A3CAgent(env_name, s, a),
-    "random": lambda env_name, s, a: RandomAgent(s, a),
-    "scripted": lambda env_name, s, a: SemiScriptedAgent(s, a)
+    "learning": lambda env_name, s, a, train: A3CAgent(env_name, s, a, train_mode=train),
+    "random": lambda env_name, s, a, train: RandomAgent(s, a),
+    "scripted": lambda env_name, s, a, train: SemiScriptedAgent(s, a)
 }
 
 builds: Dict[str, Callable[[], MlBuild]] = {
@@ -25,7 +25,7 @@ class HarvesterBot(KnowledgeBot):
     ml_build: MlBuild
 
 
-    def __init__(self, agent: str = "random", build: str = "default"):
+    def __init__(self, agent: str = "random", build: str = "default", train: bool = True):
         super().__init__("Harvester")
         if build not in builds:
             raise ValueError(f'{build} does not exist')
@@ -33,15 +33,15 @@ class HarvesterBot(KnowledgeBot):
         self.distribute = None
         self.execute_func = None
         self.conceded = False
-        self.initialize_agent(agent, build)
+        self.initialize_agent(agent, build, train)
 
-    def initialize_agent(self, agent: str, build_text):
+    def initialize_agent(self, agent: str, build_text, train: bool = True):
         self.ml_build = builds[build_text]()
 
         if isinstance(agent, BaseMLAgent):
             self.agent = agent
         else:
-            self.agent = agents[agent](build_text, self.ml_build.state_size, self.ml_build.action_size)
+            self.agent = agents[agent](build_text, self.ml_build.state_size, self.ml_build.action_size, train)
 
         self.ml_build.agent = self.agent
 

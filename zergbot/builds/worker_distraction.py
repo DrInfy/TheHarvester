@@ -14,7 +14,7 @@ from sharpy.plans.tactics.zerg import *
 from zergbot.builds.ml_build import MlBuild
 from zergbot.ml.agents import BaseMLAgent
 
-num_distraction_workers: int = 3
+num_distraction_workers: int = 5
 
 
 class WorkerDistraction_v0(MlBuild):
