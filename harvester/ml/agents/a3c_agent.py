@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 SAVE_DIR = "./data/"
 
 
-
 def record(episode,
            episode_reward,
            worker_idx,
@@ -38,12 +37,12 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    text = (f"Episode: {episode} | " 
-        f"Moving Average Reward: {int(global_ep_reward)} | "
-        f"Episode Reward: {int(episode_reward)} | "
-        f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
-        f"Steps: {num_steps} | "
-        f"Worker: {worker_idx}")
+    text = (f"Episode: {episode} | "
+            f"Moving Average Reward: {int(global_ep_reward)} | "
+            f"Episode Reward: {int(episode_reward)} | "
+            f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
+            f"Steps: {num_steps} | "
+            f"Worker: {worker_idx}")
     logger.info(text)
     print(text)
     return global_ep_reward
@@ -60,21 +59,11 @@ class ActorCriticModel(keras.Model):
         self.values = layers.Dense(1)
 
     def call(self, inputs):
-        # Forward pass
-        # x = self.dense1(inputs)
-        # logits = self.policy_logits(x)
-        # v1 = self.dense2(inputs)
-        # values = self.values(v1)
-
         x = self.dense1(inputs)
         v1 = self.dense2(x)
         logits = self.policy_logits(v1)
         values = self.values(v1)
 
-        # x = self.dense1(inputs)
-        # logits = self.policy_logits(x)
-        # # v1 = self.dense2(inputs)
-        # values = self.values(x)
         return logits, values
 
 
@@ -108,13 +97,25 @@ class A3CAgent(BaseMLAgent):
                  action_size,
                  learning_rate=0.003,
                  gamma=0.995,
-                 logit_bonus=100,
-                 logit_bonus_episodes=13000,
+                 start_temperature=100,
+                 temperature_episodes=13000,
                  log_print: Callable[[str], None] = print):
+        """
+        Create standard learning A3C agent.
+
+        @param env_name: this is used for naming the model so that different games have different models
+        @param state_size: Size of the input observation array. Integer support only for now
+        @param action_size: Size of possible output.  Integer support only for now
+        @param learning_rate: Learning rate. Something between 0.01 and 0.0001 should be fine
+        @param gamma: Should define how meaningful early game actions are to late game rewards
+        @param start_temperature: Increases randomness for the softmax action selection probability function
+        @param temperature_episodes: How long to use temperature to increase randomness
+        @param log_print: custom function for writing logs, defaults to "print"
+        """
         super().__init__(state_size, action_size)
 
-        self.logit_bonus_episodes = logit_bonus_episodes
-        self.logit_bonus = logit_bonus
+        self.temperature_episodes = temperature_episodes
+        self.start_temperature = start_temperature
         self.print = log_print
         tf.enable_eager_execution()  # Required for some numpy code.
         # tf.compat.v1.enable_eager_execution()
@@ -192,23 +193,19 @@ class A3CAgent(BaseMLAgent):
             tf.convert_to_tensor(state[None, :],
                                  dtype=tf.float32))
 
-        if self.episode < self.logit_bonus_episodes:
-            logits /= 1 + self.logit_bonus * (self.logit_bonus_episodes - self.episode) / self.logit_bonus_episodes
+        if self.episode < self.temperature_episodes:
+            # https://en.wikipedia.org/wiki/Softmax_function#Reinforcement_learning
+            # Increases randomness
+            logits /= 1 + self.start_temperature * (
+                        self.temperature_episodes - self.episode) / self.temperature_episodes
         probs = tf.nn.softmax(logits)
-        # probs = self.sample(logits, 1000)
+
         self.prev_action = np.random.choice(self.action_size, p=probs.numpy()[0])
         self.prev_state = state
 
         self.ep_steps += 1
 
         return self.prev_action
-
-    def sample(self, a, temperature=1.0):
-        a = np.array(a) ** (1 / temperature)
-        p_sum = a.sum()
-        sample_temp = a / p_sum
-        return sample_temp
-        # return np.argmax(np.random.multinomial(1, a, 1))
 
     def on_end(self, state: List[Union[float, int]], reward: float):
         self.evaluate_prev_action_reward(reward)
