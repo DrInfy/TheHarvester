@@ -27,8 +27,8 @@ class PlayA3CAgent(A3CAgent):
             tf.convert_to_tensor(state[None, :],
                                  dtype=tf.float32))
 
-        if self.episode < self.logit_bonus_episodes:
-            logits /= 1 + self.logit_bonus * (self.logit_bonus_episodes - self.episode) / self.logit_bonus_episodes
+        if self.episode < self.temperature_episodes:
+            logits /= 1 + self.start_temperature * (self.temperature_episodes - self.episode) / self.temperature_episodes
 
         probs = tf.nn.softmax(logits)
         # probs = self.sample(logits, 1000)
