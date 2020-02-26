@@ -1,6 +1,8 @@
 from typing import Callable
 import gym
-from zergbot.ml.environments.base_env import BaseEnv
+import numpy
+
+from harvester.ml.environments.base_env import BaseEnv
 
 
 class CartPoleEnv(BaseEnv):
@@ -11,6 +13,7 @@ class CartPoleEnv(BaseEnv):
 
     def run(self):
         state = self.env.reset()
+        prev_state = state
         reward = 0
         done = False
         try:

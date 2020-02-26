@@ -1,11 +1,10 @@
 from typing import Tuple, Callable
 
-from a3c_general_agent.a3c_sc2_migrate import A3CAgent
 from run_custom import setup_game
 from sc2 import Race
 from sc2.player import Bot
-from zergbot.ml.environments.base_env import BaseEnv
-from zergbot.theharvester import HarvesterBot, MlBuild
+from harvester.ml.environments.base_env import BaseEnv
+from harvester.theharvester import HarvesterBot, MlBuild
 
 
 class Sc2Env:

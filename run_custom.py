@@ -24,7 +24,7 @@ from sc2 import run_game, maps, Race, Difficulty, AIBuild
 from sc2.paths import Paths
 
 from version import update_version_txt
-from zergbot.theharvester import HarvesterBot
+from harvester.theharvester import HarvesterBot
 
 update_version_txt()
 
@@ -157,8 +157,11 @@ enemies = {
 
     # Dynamic bots
     "harvester": (lambda params:
-              Bot(Race.Zerg, HarvesterBot(index_check(params, 0, "random"), (index_check(params, 1, "default"))))),
-
+              Bot(Race.Zerg, HarvesterBot(
+                  index_check(params, 0, "learning"),
+                  index_check(params, 1, "default"),
+                  index_check(params, 2, None),
+              ))),
     # Protoss
     "adept": (lambda params: Bot(Race.Protoss, AdeptRush())),
     "zealot": (lambda params: Bot(Race.Protoss, ProxyZealotRushBot())),

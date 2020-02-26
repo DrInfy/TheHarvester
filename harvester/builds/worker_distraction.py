@@ -11,8 +11,8 @@ from sharpy.plans.acts.zerg import *
 from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
-from zergbot.builds.ml_build import MlBuild
-from zergbot.ml.agents import BaseMLAgent
+from harvester.builds.ml_build import MlBuild
+from harvester.ml.agents import BaseMLAgent
 
 num_distraction_workers: int = 3
 

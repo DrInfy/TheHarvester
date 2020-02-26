@@ -8,8 +8,8 @@ from sharpy.plans.acts.zerg import *
 from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
-from zergbot.builds.ml_build import MlBuild
-from zergbot.ml.agents import BaseMLAgent
+from harvester.builds.ml_build import MlBuild
+from harvester.ml.agents import BaseMLAgent
 
 
 class EconLings_v0(MlBuild):
@@ -21,9 +21,9 @@ class EconLings_v0(MlBuild):
     def state(self) -> List[Union[int, float]]:
         return [self.ai.time, self.ai.supply_workers, self.ai.supply_army, self.ai.minerals,
                 len(self.cache.own(UnitTypeId.LARVA)),
-                len(self.cache.own(UnitTypeId.DRONE)),
-                len(self.cache.own(UnitTypeId.ZERGLING)),
-                len(self.cache.own(UnitTypeId.HATCHERY))
+                self.get_count(UnitTypeId.DRONE),
+                self.get_count(UnitTypeId.ZERGLING),
+                self.get_count(UnitTypeId.HATCHERY),
         ]
 
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:

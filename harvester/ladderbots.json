@@ -1,0 +1,11 @@
+{
+  "Bots": {
+    "Harvester": {
+      "Race": "Zerg",
+      "Type": "Python",
+      "RootPath": "./",
+      "FileName": "run.py",
+	  "Debug": false
+    }
+  }
+}

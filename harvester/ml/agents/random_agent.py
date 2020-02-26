@@ -1,7 +1,7 @@
 import random
 from typing import List, Union
 
-from zergbot.ml.agents import BaseMLAgent
+from harvester.ml.agents import BaseMLAgent
 from numpy.core.multiarray import ndarray
 
 

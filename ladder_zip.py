@@ -30,7 +30,7 @@ ignored = [
 ]
 
 zerg_zip = LadderZip("TheHarvester", "Zerg", [
-    ("zergbot", None),
+    ("harvester", None),
     (os.path.join("zergbot", "run.py"), "run.py"),
 ], common)
 

@@ -12,6 +12,7 @@ class BaseMLAgent(ABC):
         """ State size is not necessarily int, but we can only use tabular data atm """
         self.state_size: int = state_size
         self.action_size: int = action_size
+        self.episode: int = 0
 
     @abstractmethod
     def choose_action(self, state: ndarray, reward: float) -> int:

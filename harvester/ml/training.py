@@ -4,8 +4,8 @@ import sc2
 from run_custom import setup_game
 from sc2 import Race, Difficulty, Result, AIBuild
 from sc2.player import Bot, Computer
-from zergbot.ml.agents import ActorCriticModel, A3CAgent
-from zergbot.theharvester import HarvesterBot
+from harvester.ml.agents import ActorCriticModel, A3CAgent
+from harvester.theharvester import HarvesterBot
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
