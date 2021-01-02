@@ -1,10 +1,9 @@
 import os
 
-import sc2
 from run_custom import setup_game
-from sc2 import Race, Difficulty, Result, AIBuild
-from sc2.player import Bot, Computer
-from harvester.ml.agents import ActorCriticModel, A3CAgent
+from sc2 import Race
+from sc2.player import Bot
+from tactics.ml.agents import ActorCriticModel, A3CAgent
 from harvester.theharvester import HarvesterBot
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
@@ -19,11 +18,12 @@ tf.enable_eager_execution()
 
 LEARNING_RATE = 0.001
 SAVE_DIR = "./data/"
-MODEL_FILE_NAME = 'model.h5'
+MODEL_FILE_NAME = "model.h5"
 MAX_EPS = 10
 GAMMA = 0.99
 
-class MasterAgent():
+
+class MasterAgent:
     def __init__(self):
         self.save_dir = SAVE_DIR
         if not os.path.exists(self.save_dir):
@@ -44,12 +44,10 @@ class MasterAgent():
     def train(self):
         res_queue = Queue()
 
-        workers = [Worker(self.state_size,
-                          self.action_size,
-                          self.global_model,
-                          self.opt, res_queue,
-                          i,
-                          save_dir=self.save_dir) for i in range(1)]  # todo: multiprocessing.cpu_count()
+        workers = [
+            Worker(self.state_size, self.action_size, self.global_model, self.opt, res_queue, i, save_dir=self.save_dir)
+            for i in range(1)
+        ]  # todo: multiprocessing.cpu_count()
 
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
@@ -79,9 +77,6 @@ class TrainingBot(HarvesterBot):
             a3c_agent.local_model.load_weights(model_file_path)
 
 
-
-
-
 # class Worker(threading.Thread):
 class Worker:
     # Set up global variables across different threads
@@ -91,14 +86,7 @@ class Worker:
     best_score = 0
     save_lock = threading.Lock()
 
-    def __init__(self,
-                 state_size,
-                 action_size,
-                 global_model,
-                 opt,
-                 result_queue,
-                 idx,
-                 save_dir='/tmp'):
+    def __init__(self, state_size, action_size, global_model, opt, result_queue, idx, save_dir="/tmp"):
         super(Worker, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
@@ -116,8 +104,8 @@ class Worker:
         while Worker.global_episode < MAX_EPS:
             bot1 = Bot(Race.Zerg, TrainingBot())
 
-            if not os.path.exists('replays'):
-                os.makedirs('replays')
+            if not os.path.exists("replays"):
+                os.makedirs("replays")
 
             # TODO:: Add Worker.global_episode to replay / log name?
             setup_game(True, False, bot1, "harvester", "ai.zerg.hard.macro", "AbyssalReefLE")
@@ -132,17 +120,13 @@ class Worker:
             # Calculate local gradients
             grads = tape.gradient(total_loss, bot1.ai.agent.local_model.trainable_weights)
             # Push local gradients to global model
-            self.opt.apply_gradients(zip(grads,
-                                         self.global_model.trainable_weights))
+            self.opt.apply_gradients(zip(grads, self.global_model.trainable_weights))
             # Update local model with new weights
             bot1.ai.agent.local_model.set_weights(self.global_model.get_weights())
 
             with Worker.save_lock:
-                print("Saving best model to {}, "
-                      "episode score: {}".format(self.save_dir, bot1.ai.agent.ep_reward))
-                self.global_model.save_weights(
-                    os.path.join(self.save_dir, MODEL_FILE_NAME)
-                )
+                print("Saving best model to {}, " "episode score: {}".format(self.save_dir, bot1.ai.agent.ep_reward))
+                self.global_model.save_weights(os.path.join(self.save_dir, MODEL_FILE_NAME))
                 # Worker.best_score = ep_reward
             Worker.global_episode += 1
 
@@ -151,14 +135,16 @@ class Worker:
             # total_step += 1
         self.result_queue.put(None)
 
-    def compute_loss(self,
-                     # done,
-                     # new_state,
-                     bot,
-                     # memory,
-                     gamma=0.99):
+    def compute_loss(
+        self,
+        # done,
+        # new_state,
+        bot,
+        # memory,
+        gamma=0.99,
+    ):
         # if done:
-        reward_sum = 0.  # terminal
+        reward_sum = 0.0  # terminal
         # else:
         #     reward_sum = self.local_model(
         #         tf.convert_to_tensor(new_state[None, :],
@@ -172,11 +158,10 @@ class Worker:
         discounted_rewards.reverse()
 
         logits, values = bot.ai.agent.local_model(
-            tf.convert_to_tensor(np.vstack(bot.ai.agent.mem.states),
-                                 dtype=tf.float32))
+            tf.convert_to_tensor(np.vstack(bot.ai.agent.mem.states), dtype=tf.float32)
+        )
         # Get our advantages
-        advantage = tf.convert_to_tensor(np.array(discounted_rewards)[:, None],
-                                         dtype=tf.float32) - values
+        advantage = tf.convert_to_tensor(np.array(discounted_rewards)[:, None], dtype=tf.float32) - values
         # Value loss
         value_loss = advantage ** 2
 
@@ -184,10 +169,8 @@ class Worker:
         policy = tf.nn.softmax(logits)
         entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=policy, logits=logits)
 
-        policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=bot.ai.agent.mem.actions,
-                                                                     logits=logits)
+        policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=bot.ai.agent.mem.actions, logits=logits)
         policy_loss *= tf.stop_gradient(advantage)
         policy_loss -= 0.01 * entropy
         total_loss = tf.reduce_mean((0.5 * value_loss + policy_loss))
         return total_loss
-

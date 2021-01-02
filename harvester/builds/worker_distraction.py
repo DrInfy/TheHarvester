@@ -3,7 +3,7 @@ from typing import List, Union, Tuple
 
 from sc2 import UnitTypeId
 from sc2.ids.upgrade_id import UpgradeId
-from sharpy.managers.roles import UnitTask
+from sharpy.managers.core.roles import UnitTask
 from sharpy.plans import BuildOrder, StepBuildGas
 from sharpy.plans import Step, SequentialList
 from sharpy.plans.acts import *
@@ -12,7 +12,6 @@ from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
 from harvester.builds.ml_build import MlBuild
-from harvester.ml.agents import BaseMLAgent
 
 num_distraction_workers: int = 3
 
@@ -75,7 +74,7 @@ class WorkerDistraction_v0(MlBuild):
         return [
             SequentialList([
                 ActUnit(UnitTypeId.DRONE, UnitTypeId.LARVA, 14),
-                ActExpand(2),
+                Expand(2),
                 ActBuilding(UnitTypeId.SPAWNINGPOOL, 1),
                 ActUnit(UnitTypeId.OVERLORD, UnitTypeId.LARVA, 2),
                 ActUnit(UnitTypeId.QUEEN, UnitTypeId.HATCHERY, 1),
@@ -84,7 +83,7 @@ class WorkerDistraction_v0(MlBuild):
             SequentialList(
                 [
                     ActCustom(lambda: self.attack() if self.action == 1 else self.retreat()),
-                    PlanDistributeWorkers(),
+                    DistributeWorkers(),
                     PlanZoneDefense(),
                     AutoOverLord(),
                     InjectLarva(),

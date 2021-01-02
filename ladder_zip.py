@@ -3,10 +3,11 @@
 
 import os
 import argparse
-import sys
-sys.path.insert(1, "sharpy-sc2")
-from dummy_ladder_zip import create_ladder_zip, LadderZip
+
+
+import sub_module  # Important, do not remove!
 from version import update_version_txt
+from bot_loader import LadderZip
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -22,6 +23,8 @@ common = [
     ("config.ini", None),
     (os.path.join("sharpy-sc2", "ladder.py"), "ladder.py"),
     ("ladderbots.json", None),
+    ("tactics", None),
+    ("managers", None),
 ]
 
 # Files or folders to be ignored from the archive.
@@ -29,22 +32,37 @@ ignored = [
     "__pycache__",
 ]
 
-zerg_zip = LadderZip("TheHarvester", "Zerg", [
-    ("harvester", None),
-    (os.path.join("zergbot", "run.py"), "run.py"),
-], common)
 
+protoss_zip = LadderZip(
+    "SharpenedEdge", "Protoss", [("protossbot", None), (os.path.join("protossbot", "run.py"), "run.py"),], common
+)
+
+terran_zip = LadderZip(
+    "Rusty", "Terran", [("terranbot", None), (os.path.join("terranbot", "run.py"), "run.py"),], common
+)
+
+zerg_zip = LadderZip("Blunty", "Zerg", [("zergbot", None), (os.path.join("zergbot", "run.py"), "run.py"),], common)
+
+harvester_zerg_zip = LadderZip(
+    "HarvesterZerg",
+    "Zerg",
+    [("harvester", None), ("filelock", None), (os.path.join("harvester", "run.py"), "run.py"),],
+    common,
+)
+
+harvester_protoss_zip = LadderZip(
+    "TheHarvester",
+    "Protoss",
+    [("harvester_protoss", None), ("filelock", None), (os.path.join("harvester_protoss", "run.py"), "run.py"),],
+    common,
+)
 
 zip_types = {
-    "harvester": zerg_zip,
-
+    "harvesterzerg": harvester_zerg_zip,
     # All
-    "all": None
+    "all": None,
 }
 
-def get_archive(bot_name: str) -> LadderZip:
-    bot_name = bot_name.lower()
-    return zip_types.get(bot_name)
 
 def main():
     zip_keys = list(zip_types.keys())
@@ -57,18 +75,20 @@ def main():
 
     bot_name = args.name
 
-    if not os.path.exists('dummy'):
-        os.mkdir('dummy')
+    if not os.path.exists("dummy"):
+        os.mkdir("dummy")
+
+    update_version_txt()
 
     if bot_name == "all" or not bot_name:
         zip_keys.remove("all")
         for key in zip_keys:
-            create_ladder_zip(get_archive(key), args.exe)
+            zip_types.get(key).create_ladder_zip(args.exe)
     else:
         if bot_name not in zip_keys:
-            raise ValueError(f'Unknown bot: {bot_name}, allowed values are: {zip_keys}')
+            raise ValueError(f"Unknown bot: {bot_name}, allowed values are: {zip_keys}")
 
-        create_ladder_zip(get_archive(bot_name), args.exe)
+        zip_types.get(bot_name).create_ladder_zip(args.exe)
 
 
 if __name__ == "__main__":

@@ -1,14 +1,13 @@
 from typing import Callable
 import gym
-import numpy
 
-from harvester.ml.environments.base_env import BaseEnv
+from tactics.ml import BaseEnv
 
 
 class CartPoleEnv(BaseEnv):
     def __init__(self, on_step: Callable, on_end: Callable) -> None:
         super().__init__(on_step, on_end)
-        self.game_name = 'CartPole-v1'
+        self.game_name = "CartPole-v1"
         self.env = gym.make(self.game_name)
 
     def run(self):

@@ -1,8 +1,9 @@
 from abc import abstractmethod
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Callable
 import numpy as np
 
 from sc2 import Result, UnitTypeId
+from sc2.ids.upgrade_id import UpgradeId
 from sharpy.managers.extensions import ChatManager
 from sharpy.plans import BuildOrder
 from sharpy.plans.acts import ActBase
@@ -17,8 +18,16 @@ class MlBuild(BuildOrder):
     agent: BaseMLAgent  # Initialize after init
     chatter: ChatManager
 
-    def __init__(self, state_size: int, action_size: int, orders: List[Union[ActBase, List[ActBase]]],
-                 result_multiplier: float = 1.0):
+    def __init__(
+        self,
+        state_size: int,
+        action_size: int,
+        orders: Union[
+            Union[ActBase, list, Callable[["Knowledge"], bool]],
+            List[Union[ActBase, list, Callable[["Knowledge"], bool]]],
+        ],
+        result_multiplier: float = 1.0,
+    ):
         self.state_size = state_size
         self.action_size = action_size
         self.reward = 0
@@ -32,9 +41,9 @@ class MlBuild(BuildOrder):
         self.update_on_mineral_loss = True
         super().__init__(orders)
 
-    async def start(self, knowledge: 'Knowledge'):
+    async def start(self, knowledge: "Knowledge"):
         await super().start(knowledge)
-        self.chatter: ChatManager = self.knowledge.chat_manager
+        self.chatter: ChatManager = self.knowledge.get_required_manager(ChatManager)
 
     @property
     @abstractmethod
@@ -52,40 +61,66 @@ class MlBuild(BuildOrder):
         await super().debug_draw()
 
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
-        return f'ACT{action}', (255, 255, 255)
+        return f"ACT{action}", (255, 255, 255)
 
-    async def execute(self) -> bool:
+    @property
+    def ready_to_update(self):
         current_minerals = self.ai.minerals
-        if (self.update_action_always
-                or (self.update_on_mineral_loss and current_minerals < self.last_minerals)
-                or self.action_time + self.minimum_action_time < self.ai.time):
+        if (
+            self.update_action_always
+            or (self.update_on_mineral_loss and current_minerals < self.last_minerals)
+            or self.action_time + self.minimum_action_time < self.ai.time
+        ):
             # Update action only if significant amount of time has passed or bot used minerals
             self.action_time = self.ai.time
-            current_state = np.array(self.state)
-            self.action = self.agent.choose_action(current_state, self.score)
+            self.last_minerals = current_minerals
+            return True
 
-        self.last_minerals = current_minerals
+        return False
+
+    async def execute(self) -> bool:
         await self.chat_space()
         return await super().execute()
 
     async def chat_space(self):
         if self.ai.time > 10:
-            await self.chatter.chat_taunt_once("ml_state_space", lambda: f'State size {self.state_size}')
-        if self.ai.time > 30:
-            await self.chatter.chat_taunt_once("ml_action_space", lambda: f'Action size {self.action_size}')
+            await self.chatter.chat_taunt_once("ml_state_space", lambda: f"State size {self.state_size}")
+        if self.ai.time > 20:
+            await self.chatter.chat_taunt_once("ml_action_space", lambda: f"Action size {self.action_size}")
+        if self.ai.time > 25:
+            await self.chatter.chat_taunt_once("ml_actions", self.write_actions)
         if self.ai.time > 40:
-            await self.chatter.chat_taunt_once("ml_episodes",
-                                               lambda: f'This agent has trained for {self.agent.episode} episodes')
+            await self.chatter.chat_taunt_once(
+                "ml_episodes", lambda: f"This agent has trained for {self.agent.episode} episodes"
+            )
+
+    def write_actions(self) -> str:
+        text = "Possible actions: "
+        for i in range(0, self.action_size):
+            text += str(i) + ": " + self.get_action_name_color(i)[0] + " "
+        return text
 
     def on_end(self, game_result: Result):
         self.game_ended = True
-        self.reward = REWARD_TIE*self.result_multiplier
+        self.reward = REWARD_TIE * self.result_multiplier
         if game_result == Result.Victory:
-            self.reward = REWARD_WIN*self.result_multiplier
+            self.reward = REWARD_WIN * self.result_multiplier
         elif game_result == Result.Defeat:
-            self.reward = REWARD_LOSE*self.result_multiplier
+            self.reward = REWARD_LOSE * self.result_multiplier
 
         self.agent.on_end(self.state, self.reward)
+
+    def get_ml_upgrade_progress(self, upgrades: List[UpgradeId]):
+        value = 0
+        for upgrade in upgrades:
+            if upgrade in self.knowledge.version_manager.disabled_upgrades:
+                return 0
+            tmp = self.ai.already_pending_upgrade(upgrade)
+            if 0 < tmp < 1:
+                tmp = 0.25 + tmp * 0.5
+
+            value += tmp
+        return value
 
     def get_ml_number(self, unit_type: UnitTypeId) -> int:
         """ Calculates a funny number of building progress that's useful for machine learning"""

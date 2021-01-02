@@ -6,7 +6,7 @@ from sc2 import Race
 from sc2.player import Bot
 from harvester.theharvester import HarvesterBot
 
-zerg_bot = Bot(Race.Zerg, HarvesterBot("play", "default"))
+zerg_bot = Bot(Race.Zerg, HarvesterBot("scriptonly", "default"))
 
 
 def main():
@@ -16,5 +16,5 @@ def main():
     print(result, " against opponent ", opponentid)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
