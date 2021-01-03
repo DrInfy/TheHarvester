@@ -36,10 +36,10 @@ cmd_list_ml = [
     # f"{wsl} -p1 harvesterzerg.learning.default.2 -p2 harvesterzerg.learning.default.3",
     # f"{wsl} -p1 harvesterzerg.learning -p2 harvesterzerg.learning.default.3",
 ]
-for i in range(0, 28):
+for i in range(0, 15):
     cmd_list_ml.append(f'{wsl} -p1 {harvester_test_pattern} -p2 {ai_opponents("hard")}')
 
-for i in range(0, 2):
+for i in range(0, 15):
     cmd_list_ml.append(f'{wsl} -p1 {harvester_test_pattern} -p2 {ai_opponents("veryhard")}')
 
 

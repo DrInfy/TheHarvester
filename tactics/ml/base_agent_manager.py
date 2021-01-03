@@ -33,6 +33,15 @@ class BaseAgentManager(ManagerBase):
                 log_print=log,
                 temperature_episodes=0,
             ),
+            "datalearning": lambda env_name, s, a, log: RecordLearner(
+                env_name,
+                s,
+                a,
+                learning_rate=self.learning_rate,
+                gamma=self.gamma,
+                log_print=log,
+                temperature_episodes=0,
+            ),
             "examplemask": lambda env_name, s, a, log: A3CAgent(
                 env_name, s, a, log_print=log, temperature_episodes=0, mask=[(10, 0), (2, 0.005), (3, 0.05)]
             ),
@@ -71,11 +80,13 @@ class BaseAgentManager(ManagerBase):
 
     async def start(self, knowledge: "Knowledge"):
         await super().start(knowledge)
-        self.agent = self.agents[self.agent_name](
-            self.build_name, self.build.state_size, self.build.action_size, knowledge.print
-        )
-        self.build.agent = self.agent
+        self.agent = self.create_agent(knowledge.print)
         await self.build.start(knowledge)
+
+    def create_agent(self, log: Callable[[str], None]):
+        agent = self.agents[self.agent_name](self.build_name, self.build.state_size, self.build.action_size, log)
+        self.build.agent = agent
+        return agent
 
     async def update(self):
         state = None

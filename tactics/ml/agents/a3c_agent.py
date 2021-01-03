@@ -180,6 +180,7 @@ class A3CAgent(BaseMLAgent):
         self.ep_loss = 0
         self.save_learning_data = True  # Saves memory to json file
         self.merge_master = True  # Merges learned gradients to master file
+        self.checkpoint_interval = 100  # Store checkpoint of the model after amount of episodes. Set to 0 for never
 
     def evaluate_prev_action_reward(self, reward: float):
         if self.prev_action is not None:
@@ -214,6 +215,7 @@ class A3CAgent(BaseMLAgent):
         return self.prev_action
 
     def on_end(self, state: List[Union[float, int]], reward: float):
+        self.evaluate_prev_action_reward(reward)
         grads = self.calc_gradients(reward, state)
         self.save_memory()
         self.save_global_model(grads)
@@ -231,9 +233,11 @@ class A3CAgent(BaseMLAgent):
 
     def save_global_model(self, grads):
         self.print("Saving global model")
+
+        global_model = ActorCriticModel(self.state_size, self.action_size)
+        global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+
         with FileLock(self.MODEL_FILE_LOCK_PATH):
-            global_model = ActorCriticModel(self.state_size, self.action_size)
-            global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
             global_model.load_weights(self.MODEL_FILE_PATH)
 
             optimizer: tf.keras.optimizers.Optimizer
@@ -279,7 +283,7 @@ class A3CAgent(BaseMLAgent):
                 pickle.dump(optimizer, f)
 
             episode = global_records["global_episode"]
-            if episode % 100 == 0:
+            if self.checkpoint_interval > 0 and episode % self.checkpoint_interval == 0:
                 # ensure path
                 path = os.path.join(SAVE_DIR, f"e{episode}")
                 from pathlib import Path
@@ -312,7 +316,6 @@ class A3CAgent(BaseMLAgent):
         self.merge_master_model(grads, optimizer)
 
     def calc_gradients(self, reward, state):
-        self.evaluate_prev_action_reward(reward)
         # Calculate gradient wrt to local model. We do so by tracking the
         # variables involved in computing the loss by using tf.GradientTape
         with tf.GradientTape() as tape:
