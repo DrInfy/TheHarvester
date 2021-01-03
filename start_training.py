@@ -1,6 +1,6 @@
 import subprocess
 
-wsl = "wsl python3.7 /mnt/c/Projects/sc2-overmind/runner.py"
+wsl = "wsl python3.7 /mnt/" + YOUR_PATH_TO_HARVESTER
 # to = "--timeout 900 -z"
 to = "-p2 ai.terran.hard"
 to2 = "-p2 ai.zerg.hard"
