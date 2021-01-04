@@ -1,7 +1,6 @@
 from typing import Dict, Callable, Optional, List
 
 from harvester.agent_manager import ZergAgentManager
-from managers import ExtendedUnitManager
 from sc2 import Result
 from sharpy.knowledges import KnowledgeBot
 from sharpy.managers.extensions import BuildDetector, ChatManager
@@ -39,7 +38,7 @@ class HarvesterBot(KnowledgeBot):
         build_detector = BuildDetector()
 
         agent_manager = self.create_agent_manager()
-        return [build_detector, ExtendedUnitManager(), ChatManager(), agent_manager]
+        return [build_detector, ChatManager(), agent_manager]
 
     def create_agent_manager(self):
         if self.model_index:
