@@ -51,24 +51,25 @@ def record(episode, episode_reward, worker_idx, global_ep_reward, total_loss, nu
 
 
 class ActorCriticModel(keras.Model):
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, hidden_size: int = 200):
         super(ActorCriticModel, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
-        self.dense1 = layers.Dense(140, activation="relu")
+        self.actor_dense = layers.Dense(hidden_size, activation="relu")
         self.policy_logits = layers.Dense(action_size)
-        # self.dense2 = layers.Dense(200, activation="relu")
-        self.dense3 = layers.Dense(50, activation="relu")
+        self.actor_dense2 = layers.Dense(hidden_size, activation="relu")
+        self.critic_dense = layers.Dense(hidden_size, activation="relu")
         self.values = layers.Dense(1)
 
     def call(self, inputs):
         # Decision making
-        mid_x = self.dense1(inputs)
+        x = self.actor_dense(inputs)
         # x = self.dense2(mid_x)
-        logits = self.policy_logits(mid_x)
+        logits = self.policy_logits(x)
 
         # values for converging model
-        v1 = self.dense3(inputs)
+        v1 = self.critic_dense(inputs)
+        # v1 = self.dense3(x)
         values = self.values(v1)
         return logits, values
 
@@ -85,7 +86,7 @@ class A3CAgent(BaseMLAgent):
         env_name: str,
         state_size,
         action_size,
-        learning_rate=0.010,
+        learning_rate=0.003,
         gamma=0.995,
         start_temperature=100,
         temperature_episodes=10000,
@@ -109,6 +110,7 @@ class A3CAgent(BaseMLAgent):
         self.mask: List[Tuple[int, float]] = mask
         self.temperature_episodes = temperature_episodes
         self.start_temperature = start_temperature
+        self.learning_rate = learning_rate
         self.print = log_print
         tf.enable_eager_execution()  # Required for some numpy code.
         # tf.compat.v1.enable_eager_execution()
@@ -117,10 +119,10 @@ class A3CAgent(BaseMLAgent):
         self.MODEL_NAME = "model_" + env_name
         self.MODEL_FILE_NAME = f"{self.MODEL_NAME}.h5"
         self.MODEL_FILE_PATH = os.path.join(SAVE_DIR, self.MODEL_FILE_NAME)
-        self.OPTIMIZER_FILE_NAME = f"{self.MODEL_NAME}.opt.pgz"
+        self.OPTIMIZER_FILE_NAME = f"{self.MODEL_NAME}.opt.npy"  # pgz
         self.OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, self.OPTIMIZER_FILE_NAME)
         self.MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f"{self.MODEL_FILE_NAME}.lock")
-        self.GLOBAL_RECORDS_FILE_NAME = f"{self.MODEL_NAME}.records.pkl"
+        self.GLOBAL_RECORDS_FILE_NAME = f"{self.MODEL_NAME}.records.json"
         self.GLOBAL_RECORDS_FILE_PATH = os.path.join(SAVE_DIR, self.GLOBAL_RECORDS_FILE_NAME)
         self.LOG_FILE_NAME = f"{self.MODEL_NAME}.log"
         self.LOG_FILE_PATH = os.path.join(SAVE_DIR, self.LOG_FILE_NAME)
@@ -129,7 +131,7 @@ class A3CAgent(BaseMLAgent):
         self.MASTER_MODEL_FILE_NAME = f"{self.MASTER_MODEL_NAME}.h5"
         self.MASTER_MODEL_FILE_PATH = os.path.join(SAVE_DIR, self.MASTER_MODEL_FILE_NAME)
         self.MASTER_MODEL_FILE_LOCK_PATH = os.path.join(SAVE_DIR, f"{self.MASTER_MODEL_FILE_NAME}.lock")
-        self.MASTER_GLOBAL_RECORDS_FILE_NAME = f"{self.MASTER_MODEL_NAME}.records.pkl"
+        self.MASTER_GLOBAL_RECORDS_FILE_NAME = f"{self.MASTER_MODEL_NAME}.records.json"
         self.MASTER_GLOBAL_RECORDS_FILE_PATH = os.path.join(SAVE_DIR, self.MASTER_GLOBAL_RECORDS_FILE_NAME)
 
         if not os.path.exists(SAVE_DIR):
@@ -144,21 +146,30 @@ class A3CAgent(BaseMLAgent):
 
             if not os.path.isfile(self.OPTIMIZER_FILE_PATH):
                 # Create saved optimizer
-                with gzip.GzipFile(self.OPTIMIZER_FILE_PATH, "wb") as f:
-                    # pickle.dump(tf.train.AdamOptimizer(learning_rate, use_locking=True), f)
-                    pickle.dump(tf.keras.optimizers.Adam(learning_rate=learning_rate), f)
+                optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+                grad_vars = global_model.trainable_weights
+                zero_grads = [tf.zeros_like(w) for w in grad_vars]
+                # Apply gradients which don't do nothing with Adam
+                optimizer.apply_gradients(zip(zero_grads, grad_vars))
+
+                np.save(self.OPTIMIZER_FILE_PATH, optimizer.get_weights())
+
+                # with gzip.GzipFile(self.OPTIMIZER_FILE_PATH, "wb") as f:
+                #     pickle.dump(tf.keras.optimizers.Adam(learning_rate=learning_rate), f)
 
             if not os.path.isfile(self.GLOBAL_RECORDS_FILE_PATH):
                 # Create saved global records
-                with open(self.GLOBAL_RECORDS_FILE_PATH, "wb") as f:
+                with open(self.GLOBAL_RECORDS_FILE_PATH, "w") as f:
                     global_records = {
                         "global_episode": 1,
                         "global_moving_average_reward": 0,
                     }
-                    pickle.dump(global_records, f)
+                    frozen = jsonpickle.encode(global_records)
+                    f.write(frozen)
             else:
-                with open(self.GLOBAL_RECORDS_FILE_PATH, "rb") as f:
-                    global_records = pickle.load(f)
+                with open(self.GLOBAL_RECORDS_FILE_PATH, "r") as f:
+                    text = f.read()
+                    global_records = jsonpickle.decode(text)
 
             self.local_model = ActorCriticModel(self.state_size, self.action_size)
             self.local_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
@@ -179,12 +190,13 @@ class A3CAgent(BaseMLAgent):
 
         self.ep_loss = 0
         self.save_learning_data = True  # Saves memory to json file
-        self.merge_master = True  # Merges learned gradients to master file
+        self.merge_master = False  # Merges learned gradients to master file
         self.checkpoint_interval = 100  # Store checkpoint of the model after amount of episodes. Set to 0 for never
 
     def evaluate_prev_action_reward(self, reward: float):
         if self.prev_action is not None:
-            self.ep_reward += reward
+            # TODO: rename reward to score or something to reflect that it's the current state value
+            self.ep_reward = reward
             self.mem.store(self.prev_state, self.prev_action, reward)
 
     def choose_action(self, state: ndarray, reward: float) -> int:
@@ -241,13 +253,25 @@ class A3CAgent(BaseMLAgent):
             global_model.load_weights(self.MODEL_FILE_PATH)
 
             optimizer: tf.keras.optimizers.Optimizer
+            # rebuild optimizer
+            optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+            grad_vars = global_model.trainable_weights
+            zero_grads = [tf.zeros_like(w) for w in grad_vars]
+            # Apply gradients which don't do nothing with Adam
+            optimizer.apply_gradients(zip(zero_grads, grad_vars))
+            # Get saved weights
+            opt_weights = np.load(self.OPTIMIZER_FILE_PATH, allow_pickle=True)
+            # Set the weights of the optimizer
+            optimizer.set_weights(opt_weights)
+
             # with open(self.OPTIMIZER_FILE_PATH, "rb") as f:
-            with gzip.open(self.OPTIMIZER_FILE_PATH, "rb") as f:
-                optimizer = pickle.load(f)
+            # with gzip.open(self.OPTIMIZER_FILE_PATH, "rb") as f:
+            #     optimizer = pickle.load(f)
 
             global_records: dict
-            with open(self.GLOBAL_RECORDS_FILE_PATH, "rb") as f:
-                global_records = pickle.load(f)
+            with open(self.GLOBAL_RECORDS_FILE_PATH, "r") as f:
+                text = f.read()
+                global_records = jsonpickle.decode(text)
 
             # work with the file as it is now locked
 
@@ -279,8 +303,10 @@ class A3CAgent(BaseMLAgent):
             global_model.save_weights(self.MODEL_FILE_PATH)
 
             # Save optimizer weights.
-            with gzip.GzipFile(self.OPTIMIZER_FILE_PATH, "wb") as f:
-                pickle.dump(optimizer, f)
+            np.save(self.OPTIMIZER_FILE_PATH, optimizer.get_weights())
+
+            # with gzip.GzipFile(self.OPTIMIZER_FILE_PATH, "wb") as f:
+            #     pickle.dump(optimizer, f)
 
             episode = global_records["global_episode"]
             if self.checkpoint_interval > 0 and episode % self.checkpoint_interval == 0:
@@ -297,19 +323,22 @@ class A3CAgent(BaseMLAgent):
                 global_model.save_weights(backup_path)
 
                 # Save optimizer weights.
-                with gzip.GzipFile(backup_path_opt, "wb") as f:
-                    # with open(backup_path_opt, "wb") as f:
-                    pickle.dump(optimizer, f)
+                np.save(backup_path_opt, optimizer.get_weights())
+                # with gzip.GzipFile(backup_path_opt, "wb") as f:
+                #     # with open(backup_path_opt, "wb") as f:
+                #     pickle.dump(optimizer, f)
 
-                with open(backup_path_record, "wb") as f:
-                    pickle.dump(global_records, f)
+                with open(backup_path_record, "w") as f:
+                    frozen = jsonpickle.encode(global_records)
+                    f.write(frozen)
 
             # Worker.global_episode += 1
             global_records["global_episode"] += 1
 
             # Save global records
-            with open(self.GLOBAL_RECORDS_FILE_PATH, "wb") as f:
-                pickle.dump(global_records, f)
+            with open(self.GLOBAL_RECORDS_FILE_PATH, "w") as f:
+                frozen = jsonpickle.encode(global_records)
+                f.write(frozen)
 
         self.print("Global model saved")
 
@@ -349,8 +378,9 @@ class A3CAgent(BaseMLAgent):
                     "global_moving_average_reward": 0,
                 }
             else:
-                with open(self.MASTER_GLOBAL_RECORDS_FILE_PATH, "rb") as f:
-                    master_global_records = pickle.load(f)
+                with open(self.MASTER_GLOBAL_RECORDS_FILE_PATH, "r") as f:
+                    text = f.read()
+                    master_global_records = jsonpickle.decode(text)
 
             master_global_records["global_episode"] = master_global_records["global_episode"] + 1
 
@@ -367,8 +397,10 @@ class A3CAgent(BaseMLAgent):
             master_global_model.save_weights(self.MASTER_MODEL_FILE_PATH)
 
             # Save global records
-            with open(self.MASTER_GLOBAL_RECORDS_FILE_PATH, "wb") as f:
-                pickle.dump(master_global_records, f)
+            with open(self.MASTER_GLOBAL_RECORDS_FILE_PATH, "w") as f:
+                frozen = jsonpickle.encode(master_global_records)
+                f.write(frozen)
+
         self.print("Master model saved")
 
     def compute_loss(self, done, new_state, memory_obj: Memory, gamma):
@@ -380,10 +412,28 @@ class A3CAgent(BaseMLAgent):
             reward_sum = self.local_model(tf.convert_to_tensor(new_state[None, :], dtype=tf.float32))[-1].numpy()[0]
 
         # Get discounted rewards
+        # discounted_rewards = []
+        # for i in range(0, len(memory.rewards)):
+        #     # Iterate in reverse to calculate reward sum
+        #     score = memory.rewards[-1 - i]
+        #     # Our reward number actually represents score, not reward
+        #     # Get diff between current score and previous score to get reward
+        #
+        #     if i >= len(memory.rewards) - 1:
+        #         # First action, set reward to 0
+        #         reward = 0
+        #     else:
+        #         reward = score - memory.rewards[-2 - i]
+        #     # Reward sum is the expected value of the action
+        #     reward_sum = reward + gamma * reward_sum
+        #     discounted_rewards.append(reward_sum)
+
+        # Get discounted rewards
         discounted_rewards = []
         for reward in memory.rewards[::-1]:  # reverse buffer r
             reward_sum = reward + gamma * reward_sum
             discounted_rewards.append(reward_sum)
+        # Because we iterated in reverse, reverse to make it align with states
         discounted_rewards.reverse()
 
         logits, values = self.local_model(tf.convert_to_tensor(np.vstack(memory.states), dtype=tf.float32))

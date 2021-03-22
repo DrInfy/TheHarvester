@@ -3,6 +3,7 @@ from typing import List, Union, Tuple, Callable
 import numpy as np
 
 from sc2 import Result, UnitTypeId
+from sc2.constants import EQUIVALENTS_FOR_TECH_PROGRESS
 from sc2.ids.upgrade_id import UpgradeId
 from sharpy.managers.extensions import ChatManager
 from sharpy.plans import BuildOrder
@@ -12,6 +13,12 @@ from tactics.ml.agents import BaseMLAgent
 REWARD_WIN = 1
 REWARD_LOSE = 0
 REWARD_TIE = 0  # Any ties are going to be strange builds anyway with 100% for example
+
+
+class StateFunc:  # Statefunction
+    def __init__(self, name: str, func: Callable[[], float]) -> None:
+        self.name = name
+        self.f = func
 
 
 class MlBuild(BuildOrder):
@@ -31,6 +38,7 @@ class MlBuild(BuildOrder):
         self.state_size = state_size
         self.action_size = action_size
         self.reward = 0
+        self.last_reward = 0
         self.game_ended = False
         self.action: int = 0
         self.result_multiplier: float = result_multiplier
@@ -39,6 +47,7 @@ class MlBuild(BuildOrder):
         self.minimum_action_time = 1
         self.update_action_always = False  # Set this true to update bot action every step
         self.update_on_mineral_loss = True
+        self.use_difference_reward = True
         super().__init__(orders)
 
     async def start(self, knowledge: "Knowledge"):
@@ -50,8 +59,13 @@ class MlBuild(BuildOrder):
     def state(self) -> List[Union[int, float]]:
         pass
 
+    def calc_reward(self):
+        self.reward = 0
+
     @property
     def score(self) -> float:
+        if self.use_difference_reward:
+            return self.reward - self.last_reward
         return self.reward
 
     async def debug_draw(self):
@@ -122,13 +136,14 @@ class MlBuild(BuildOrder):
             value += tmp
         return value
 
-    def get_ml_number(self, unit_type: UnitTypeId) -> int:
+    def get_ml_number(self, unit_type: UnitTypeId) -> float:
         """ Calculates a funny number of building progress that's useful for machine learning"""
         units = self.cache.own(unit_type)
-        normal_count = len(units)
+        normal_count = len(units.ready)
         not_ready = units.not_ready
         not_ready_count = not_ready.amount
-        normal_count = self.related_count(normal_count, unit_type)
+        if unit_type in EQUIVALENTS_FOR_TECH_PROGRESS:
+            normal_count += self.cache.own(EQUIVALENTS_FOR_TECH_PROGRESS[unit_type]).ready.amount
 
         magic = self.unit_pending_count(unit_type) + not_ready_count
         magic += normal_count * 10

@@ -11,7 +11,7 @@ from sharpy.plans.require import *
 from sharpy.plans.require.supply import SupplyType
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
-from tactics.ml.ml_build import MlBuild
+from tactics.ml.ml_build import MlBuild, StateFunc
 from tactics import *
 from sharpy.managers.extensions import BuildDetector
 from sharpy.managers.core import EnemyUnitsManager
@@ -35,191 +35,17 @@ class AllBuild(MlBuild):
     game_analyzer: IGameAnalyzer
 
     def __init__(self):
-        self.statesf: List[Callable[[], float]] = []
+        self.statesf: List[StateFunc] = []
         self.statesr: List[float] = []
         self.attack = PlanZoneAttack(15)
         self.attack.attack_on_advantage = False
         orders = self.create_builds()
+        self.debug_data: List[List[Any]] = []
         self.init_funcs()
         # Dropping Hive tech for now
         super().__init__(len(self.statesf), 18, orders, result_multiplier=1)
-        self.minimum_action_time = 5
+        self.minimum_action_time = 1
         self.update_on_mineral_loss = False
-
-    def init_funcs(self):
-        self.statesf.append(lambda: self.ai.time)
-        self.statesf.append(lambda: self.ai.minerals)
-        self.statesf.append(lambda: self.ai.vespene)
-        self.statesf.append(lambda: self.ai.supply_workers)
-        self.statesf.append(lambda: self.ai.supply_army)
-        self.statesf.append(lambda: self.zm.expansion_zones[0].paths[len(self.zm.expansion_zones) - 1].distance)
-
-        self.add_score_funcs()
-        self.statesf.append(lambda: len(self.ai.townhalls.filter(lambda u: not u.is_active)))
-
-        self.statesf.append(lambda: numerize_race(self.ai.enemy_race))
-        self.statesf.append(lambda: self.game_analyzer.our_power.air_power)
-        self.statesf.append(lambda: self.game_analyzer.our_power.ground_power)
-        self.statesf.append(lambda: self.game_analyzer.our_power.air_presence)
-        self.statesf.append(lambda: self.game_analyzer.our_power.ground_presence)
-
-        self.statesf.append(lambda: self.game_analyzer.enemy_power.air_power)
-        self.statesf.append(lambda: self.game_analyzer.enemy_power.ground_power)
-        self.statesf.append(lambda: self.game_analyzer.enemy_power.air_presence)
-        self.statesf.append(lambda: self.game_analyzer.enemy_power.ground_presence)
-
-        for upgrade in zerg_upgrades:
-            self.statesf.append(lambda tmp=upgrade: self.get_ml_upgrade_progress([tmp]))
-
-        self.statesf.append(
-            lambda: self.get_ml_upgrade_progress(
-                [
-                    UpgradeId.ZERGMISSILEWEAPONSLEVEL1,
-                    UpgradeId.ZERGMISSILEWEAPONSLEVEL2,
-                    UpgradeId.ZERGMISSILEWEAPONSLEVEL3,
-                ]
-            )
-        )
-        self.statesf.append(
-            lambda: self.get_ml_upgrade_progress(
-                [UpgradeId.ZERGGROUNDARMORSLEVEL1, UpgradeId.ZERGGROUNDARMORSLEVEL2, UpgradeId.ZERGGROUNDARMORSLEVEL3]
-            )
-        )
-        self.statesf.append(
-            lambda: self.get_ml_upgrade_progress(
-                [UpgradeId.ZERGMELEEWEAPONSLEVEL1, UpgradeId.ZERGMELEEWEAPONSLEVEL2, UpgradeId.ZERGMELEEWEAPONSLEVEL3]
-            )
-        )
-
-        self.add_flier_upgrades()
-
-        for unit_type in zerg_units:
-            self.statesf.append(lambda tmp=unit_type: self.get_ordered_count(tmp))
-            self.statesf.append(
-                lambda tmp=unit_type: self.get_count(tmp, include_pending=False, include_not_ready=False)
-            )
-
-        for building_type in zerg_buildings:
-            self.statesf.append(lambda tmp=building_type: self.get_ml_number(tmp))
-
-        self.add_enemy_zerg()
-        self.add_enemy_terran()
-        self.add_enemy_protoss()
-
-        for index in range(0, 5):
-            self.zone_values(index)
-
-        for index in range(-5, 0):
-            self.zone_values(index)
-
-    def zone_values(self, zone_index: int):
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].our_power.air_presence)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].our_power.ground_presence)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].our_power.air_power)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].our_power.ground_power)
-
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.air_presence)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.ground_presence)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.air_power)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.ground_power)
-
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.air_presence)
-        self.statesf.append(
-            lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.ground_presence
-        )
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.air_power)
-        self.statesf.append(lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.ground_power)
-
-    def add_flier_upgrades(self):
-        self.statesf.append(
-            lambda: self.get_ml_upgrade_progress(
-                [UpgradeId.ZERGFLYERWEAPONSLEVEL1, UpgradeId.ZERGFLYERWEAPONSLEVEL2, UpgradeId.ZERGFLYERWEAPONSLEVEL3]
-            )
-        )
-
-        self.statesf.append(
-            lambda: self.get_ml_upgrade_progress(
-                [UpgradeId.ZERGFLYERARMORSLEVEL1, UpgradeId.ZERGFLYERARMORSLEVEL2, UpgradeId.ZERGFLYERARMORSLEVEL3]
-            )
-        )
-
-    def add_score_funcs(self):
-        self.statesf.append(lambda: self.ai.state.score.collection_rate_minerals)
-        self.statesf.append(lambda: self.ai.state.score.collection_rate_vespene)
-
-        self.statesf.append(lambda: self.ai.state.score.killed_minerals_army)
-        self.statesf.append(lambda: self.ai.state.score.killed_minerals_economy)
-        self.statesf.append(lambda: self.ai.state.score.killed_minerals_technology)
-        self.statesf.append(lambda: self.ai.state.score.killed_minerals_upgrade)
-
-        self.statesf.append(lambda: self.ai.state.score.killed_vespene_army)
-        self.statesf.append(lambda: self.ai.state.score.killed_vespene_economy)
-        self.statesf.append(lambda: self.ai.state.score.killed_vespene_technology)
-        self.statesf.append(lambda: self.ai.state.score.killed_vespene_upgrade)
-
-        self.statesf.append(lambda: self.ai.state.score.lost_minerals_army)
-        self.statesf.append(lambda: self.ai.state.score.lost_minerals_economy)
-        self.statesf.append(lambda: self.ai.state.score.lost_minerals_technology)
-        self.statesf.append(lambda: self.ai.state.score.lost_minerals_upgrade)
-
-        self.statesf.append(lambda: self.ai.state.score.lost_vespene_army)
-        self.statesf.append(lambda: self.ai.state.score.lost_vespene_economy)
-        self.statesf.append(lambda: self.ai.state.score.lost_vespene_technology)
-        self.statesf.append(lambda: self.ai.state.score.lost_vespene_upgrade)
-
-        self.statesf.append(lambda: self.ai.state.score.used_minerals_army)
-        self.statesf.append(lambda: self.ai.state.score.used_minerals_economy)
-        self.statesf.append(lambda: self.ai.state.score.used_minerals_technology)
-        self.statesf.append(lambda: self.ai.state.score.used_minerals_upgrade)
-
-        self.statesf.append(lambda: self.ai.state.score.used_vespene_army)
-        self.statesf.append(lambda: self.ai.state.score.used_vespene_economy)
-        self.statesf.append(lambda: self.ai.state.score.used_vespene_technology)
-        self.statesf.append(lambda: self.ai.state.score.used_vespene_upgrade)
-
-    def add_enemy_zerg(self):
-        for unit_type in zerg_units:
-            self.statesf.append(lambda: self.eu.unit_count(unit_type))
-
-        for building_type in zerg_buildings:
-            self.statesf.append(lambda: self.get_building_timing(building_type, 0))
-
-        self.add_timings(UnitTypeId.HATCHERY, 6)
-
-        self.statesf.append(lambda: self.get_building_timing(UnitTypeId.EVOLUTIONCHAMBER, 1))
-        self.statesf.append(lambda: self.get_building_timing(UnitTypeId.SPIRE, 1))
-        self.add_timings(UnitTypeId.SPORECRAWLER, 5)
-        self.add_timings(UnitTypeId.SPINECRAWLER, 5)
-
-    def add_enemy_terran(self):
-        for unit_type in terran_units:
-            self.statesf.append(lambda: self.eu.unit_count(unit_type))
-
-        for building_type in terran_buildings:
-            self.statesf.append(lambda: self.get_building_timing(building_type, 0))
-
-        self.add_timings(UnitTypeId.COMMANDCENTER, 6)
-        self.add_timings(UnitTypeId.BARRACKS, 6)
-        self.add_timings(UnitTypeId.FACTORY, 4)
-        self.add_timings(UnitTypeId.STARPORT, 3)
-        self.add_timings(UnitTypeId.SUPPLYDEPOT, 5)
-        self.add_timings(UnitTypeId.BUNKER, 5)
-        self.add_timings(UnitTypeId.MISSILETURRET, 5)
-
-    def add_enemy_protoss(self):
-        for unit_type in protoss_units:
-            self.statesf.append(lambda tmp=unit_type: self.eu.unit_count(tmp))
-
-        for building_type in protoss_buildings:
-            self.statesf.append(lambda tmp=building_type: self.get_building_timing(tmp, 0))
-
-        self.add_timings(UnitTypeId.NEXUS, 6)
-        self.add_timings(UnitTypeId.GATEWAY, 8)
-        self.add_timings(UnitTypeId.ROBOTICSFACILITY, 3)
-        self.add_timings(UnitTypeId.STARPORT, 3)
-        self.add_timings(UnitTypeId.PYLON, 6)
-        self.add_timings(UnitTypeId.PHOTONCANNON, 5)
-        self.add_timings(UnitTypeId.SHIELDBATTERY, 5)
 
     async def start(self, knowledge: "Knowledge"):
         await super().start(knowledge)
@@ -231,7 +57,7 @@ class AllBuild(MlBuild):
 
     def add_timings(self, unit_type: UnitTypeId, count: int):
         for index in range(1, count):
-            self.statesf.append(lambda: self.get_building_timing(unit_type, index))
+            self.add_state(f"Timing: {unit_type.name} {count}", lambda: self.get_building_timing(unit_type, index))
 
     def get_building_timing(self, unit_type: UnitTypeId, index: int) -> float:
         timing_list = self.bp.timings.get(unit_type, None)
@@ -239,8 +65,7 @@ class AllBuild(MlBuild):
             return 0
         return timing_list[index]
 
-    @property
-    def score(self) -> float:
+    def calc_reward(self):
         score = 0
         # used = current
         # total_used_minerals_army = all value ever used
@@ -258,8 +83,10 @@ class AllBuild(MlBuild):
         # score -= self.ai.state.score.lost_minerals_economy
         # score -= self.ai.state.score.lost_vespene_technology
         # score -= self.ai.state.score.lost_minerals_technology
+        # if self.ai.time > 15 * 60:
+        #     score -= (self.ai.time - 15 * 60) * 10
 
-        score = max(0, min(10000, score))  # Let's cap the score in order to not keep grinding enemy units forever
+        # score = max(0, min(25000, score))  # Let's cap the score in order to not keep grinding enemy units forever
 
         # score += self.ai.state.score.used_minerals_army
         # score += self.ai.state.score.used_vespene_army
@@ -269,7 +96,7 @@ class AllBuild(MlBuild):
         for gas_building in self.ai.gas_buildings:
             score += min(gas_building.ideal_harvesters, gas_building.assigned_harvesters) * 50
 
-        score += self.calc_upgrade_score()
+        # score += self.calc_upgrade_score()
 
         # score -= self.ai.state.score.lost_minerals_economy
         # score -= self.ai.state.score.lost_vespene_economy
@@ -284,6 +111,14 @@ class AllBuild(MlBuild):
         # score += self.ai.state.score.collection_rate_vespene
         #
         self.reward = score / 100.0
+
+        # if (
+        #     self.ai.time < 5 * 60
+        #     and self.cache.own(UnitTypeId.EVOLUTIONCHAMBER)
+        #     and not self.cache.own(UnitTypeId.SPAWNINGPOOL)
+        # ):
+        #     # Just no
+        #     self.reward -= 3
 
         return super().score
 
@@ -375,8 +210,9 @@ class AllBuild(MlBuild):
     @property
     def state(self) -> List[Union[int, float]]:
         self.statesr.clear()
-        for func in self.statesf:
-            self.statesr.append(func())
+        for sf in self.statesf:
+            self.statesr.append(sf.f())
+        self.do_debug()
         return self.statesr
 
     def on_end(self, game_result: Result):
@@ -908,3 +744,255 @@ class AllBuild(MlBuild):
             ),
             tactics,
         ]
+
+    # region States
+
+    def add_state(self, name: str, func: Callable[[], float]):
+        self.statesf.append(StateFunc(name, func))
+
+    def init_funcs(self):
+        self.add_state("time", lambda: self.ai.time)
+        self.add_state("last action", lambda: self.action)
+        self.add_state("enemy zones", lambda: len(self.zm.enemy_zones))
+        self.add_state("our zones", lambda: len(self.zm.our_zones))
+        self.add_state("minerals", lambda: self.ai.minerals)
+        self.add_state("vespene", lambda: self.ai.vespene)
+        self.add_state("supply_workers", lambda: self.ai.supply_workers)
+        self.add_state("supply_army", lambda: self.ai.supply_army)
+        self.add_state("supply_used", lambda: self.ai.supply_used)
+        self.add_state("supply_left", lambda: self.ai.supply_left)
+        self.add_state(
+            "rush distance", lambda: self.zm.expansion_zones[0].paths[len(self.zm.expansion_zones) - 1].distance
+        )
+        self.add_score_funcs()
+        self.add_state("active townhalls", lambda: len(self.ai.townhalls.filter(lambda u: not u.is_active)))
+
+        self.add_state("enemy_race", lambda: numerize_race(self.ai.enemy_race))
+        self.add_state("our_power.power", lambda: self.game_analyzer.our_power.power)
+        self.add_state("our_power.air_power", lambda: self.game_analyzer.our_power.air_power)
+        self.add_state("our_power.ground_power", lambda: self.game_analyzer.our_power.ground_power)
+        self.add_state("our_power.air_presence", lambda: self.game_analyzer.our_power.air_presence)
+        self.add_state("our_power.ground_presence", lambda: self.game_analyzer.our_power.ground_presence)
+
+        self.add_state("enemy_power.power", lambda: self.game_analyzer.enemy_power.power)
+        self.add_state("enemy_power.air_power", lambda: self.game_analyzer.enemy_power.air_power)
+        self.add_state("enemy_power.ground_power", lambda: self.game_analyzer.enemy_power.ground_power)
+        self.add_state("enemy_power.air_presence", lambda: self.game_analyzer.enemy_power.air_presence)
+        self.add_state("enemy_power.ground_presence", lambda: self.game_analyzer.enemy_power.ground_presence)
+
+        self.add_state("enemy_predict_power.power", lambda: self.game_analyzer.enemy_predict_power.power)
+        self.add_state("enemy_predict_power.air_power", lambda: self.game_analyzer.enemy_predict_power.air_power)
+        self.add_state("enemy_predict_power.ground_power", lambda: self.game_analyzer.enemy_predict_power.ground_power)
+        self.add_state("enemy_predict_power.air_presence", lambda: self.game_analyzer.enemy_predict_power.air_presence)
+        self.add_state(
+            "enemy_predict_power.ground_presence", lambda: self.game_analyzer.enemy_predict_power.ground_presence
+        )
+
+        for upgrade in zerg_upgrades:
+            if isinstance(upgrade, list):
+                self.add_state(upgrade[0].name, lambda tmp=upgrade: self.get_ml_upgrade_progress(tmp))
+            else:
+                self.add_state(upgrade.name, lambda tmp=upgrade: self.get_ml_upgrade_progress([tmp]))
+
+        for unit_type in zerg_units:
+            self.add_state(unit_type.name, lambda tmp=unit_type: self.get_ordered_count(tmp))
+            self.add_state(
+                unit_type.name + "(ready)",
+                lambda tmp=unit_type: self.get_count(tmp, include_pending=False, include_not_ready=False),
+            )
+
+        for building_type in zerg_buildings:
+            self.add_state(building_type.name, lambda tmp=building_type: self.get_ml_number(tmp))
+
+        self.add_enemy_zerg()
+        self.add_enemy_terran()
+        self.add_enemy_protoss()
+
+        for index in range(0, 5):
+            self.zone_values(index)
+
+        for index in range(-5, 0):
+            self.zone_values(index)
+
+    def add_timings(self, unit_type: UnitTypeId, count: int):
+        for index in range(1, count):
+            self.add_state(f"Timing: {unit_type.name} {count}", lambda: self.get_building_timing(unit_type, index))
+
+    def zone_values(self, zone_index: int):
+        self.add_state(
+            f"Z{zone_index}: our_power.air_presence",
+            lambda: self.zone_manager.expansion_zones[zone_index].our_power.air_presence,
+        )
+        self.add_state(
+            f"Z{zone_index}: our_power.ground_presence",
+            lambda: self.zone_manager.expansion_zones[zone_index].our_power.ground_presence,
+        )
+        self.add_state(
+            f"Z{zone_index}: our_power.air_power",
+            lambda: self.zone_manager.expansion_zones[zone_index].our_power.air_power,
+        )
+        self.add_state(
+            f"Z{zone_index}: our_power.ground_power",
+            lambda: self.zone_manager.expansion_zones[zone_index].our_power.ground_power,
+        )
+
+        self.add_state(
+            f"Z{zone_index}: enemy_power.air_presence",
+            lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.air_presence,
+        )
+        self.add_state(
+            f"Z{zone_index}: enemy_power.ground_presence",
+            lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.ground_presence,
+        )
+        self.add_state(
+            f"Z{zone_index}: enemy_power.air_power",
+            lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.air_power,
+        )
+        self.add_state(
+            f"Z{zone_index}: enemy_power.ground_power",
+            lambda: self.zone_manager.expansion_zones[zone_index].known_enemy_power.ground_power,
+        )
+
+        self.add_state(
+            f"Z{zone_index}: assaulting_enemy_power.air_presence",
+            lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.air_presence,
+        )
+        self.add_state(
+            f"Z{zone_index}: assaulting_enemy_power.ground_presence",
+            lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.ground_presence,
+        )
+        self.add_state(
+            f"Z{zone_index}: assaulting_enemy_power.air_power",
+            lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.air_power,
+        )
+        self.add_state(
+            f"Z{zone_index}: assaulting_enemy_power.ground_power",
+            lambda: self.zone_manager.expansion_zones[zone_index].assaulting_enemy_power.ground_power,
+        )
+
+    def add_score_funcs(self):
+        self.add_state("collection_rate_minerals", lambda: self.ai.state.score.collection_rate_minerals)
+        self.add_state("collection_rate_vespene", lambda: self.ai.state.score.collection_rate_vespene)
+
+        self.add_state("killed_minerals_army", lambda: self.ai.state.score.killed_minerals_army)
+        self.add_state("killed_minerals_economy", lambda: self.ai.state.score.killed_minerals_economy)
+        self.add_state("killed_minerals_technology", lambda: self.ai.state.score.killed_minerals_technology)
+        self.add_state("killed_minerals_upgrade", lambda: self.ai.state.score.killed_minerals_upgrade)
+
+        self.add_state("killed_vespene_army", lambda: self.ai.state.score.killed_vespene_army)
+        self.add_state("killed_vespene_economy", lambda: self.ai.state.score.killed_vespene_economy)
+        self.add_state("killed_vespene_technology", lambda: self.ai.state.score.killed_vespene_technology)
+        self.add_state("killed_vespene_upgrade", lambda: self.ai.state.score.killed_vespene_upgrade)
+
+        self.add_state("lost_minerals_army", lambda: self.ai.state.score.lost_minerals_army)
+        self.add_state("lost_minerals_economy", lambda: self.ai.state.score.lost_minerals_economy)
+        self.add_state("lost_minerals_technology", lambda: self.ai.state.score.lost_minerals_technology)
+        self.add_state("lost_minerals_upgrade", lambda: self.ai.state.score.lost_minerals_upgrade)
+
+        self.add_state("lost_vespene_army", lambda: self.ai.state.score.lost_vespene_army)
+        self.add_state("lost_vespene_economy", lambda: self.ai.state.score.lost_vespene_economy)
+        self.add_state("lost_vespene_technology", lambda: self.ai.state.score.lost_vespene_technology)
+        self.add_state("lost_vespene_upgrade", lambda: self.ai.state.score.lost_vespene_upgrade)
+
+        self.add_state("used_minerals_army", lambda: self.ai.state.score.used_minerals_army)
+        self.add_state("used_minerals_economy", lambda: self.ai.state.score.used_minerals_economy)
+        self.add_state("used_minerals_technology", lambda: self.ai.state.score.used_minerals_technology)
+        self.add_state("used_minerals_upgrade", lambda: self.ai.state.score.used_minerals_upgrade)
+
+        self.add_state("used_vespene_army", lambda: self.ai.state.score.used_vespene_army)
+        self.add_state("used_vespene_economy", lambda: self.ai.state.score.used_vespene_economy)
+        self.add_state("used_vespene_technology", lambda: self.ai.state.score.used_vespene_technology)
+        self.add_state("used_vespene_upgrade", lambda: self.ai.state.score.used_vespene_upgrade)
+
+    def add_enemy_zerg(self):
+        for unit_type in zerg_units:
+            self.add_state(f"e: {unit_type.name}", lambda: self.eu.unit_count(unit_type))
+
+        for building_type in zerg_buildings:
+            self.add_state(f"e: {building_type.name}", lambda: self.get_building_timing(building_type, 0))
+
+        self.add_timings(UnitTypeId.HATCHERY, 6)
+
+        self.add_state(
+            f"e: {UnitTypeId.EVOLUTIONCHAMBER.name}", lambda: self.get_building_timing(UnitTypeId.EVOLUTIONCHAMBER, 1)
+        )
+        self.add_state(f"e: {UnitTypeId.SPIRE.name}", lambda: self.get_building_timing(UnitTypeId.SPIRE, 1))
+        self.add_timings(UnitTypeId.SPORECRAWLER, 5)
+        self.add_timings(UnitTypeId.SPINECRAWLER, 5)
+
+    def add_enemy_terran(self):
+        for unit_type in terran_units:
+            self.add_state(f"e: {unit_type.name}", lambda: self.eu.unit_count(unit_type))
+
+        for building_type in terran_buildings:
+            self.add_state(f"e: {building_type.name}", lambda: self.get_building_timing(building_type, 0))
+
+        self.add_timings(UnitTypeId.COMMANDCENTER, 6)
+        self.add_timings(UnitTypeId.BARRACKS, 6)
+        self.add_timings(UnitTypeId.FACTORY, 4)
+        self.add_timings(UnitTypeId.STARPORT, 3)
+        self.add_timings(UnitTypeId.SUPPLYDEPOT, 5)
+        self.add_timings(UnitTypeId.BUNKER, 5)
+        self.add_timings(UnitTypeId.MISSILETURRET, 5)
+
+    def add_enemy_protoss(self):
+        for unit_type in protoss_units:
+            self.add_state(f"e: {unit_type.name}", lambda tmp=unit_type: self.eu.unit_count(tmp))
+
+        for building_type in protoss_buildings:
+            self.add_state(f"e: {building_type.name}", lambda tmp=building_type: self.get_building_timing(tmp, 0))
+
+        self.add_timings(UnitTypeId.NEXUS, 6)
+        self.add_timings(UnitTypeId.GATEWAY, 8)
+        self.add_timings(UnitTypeId.ROBOTICSFACILITY, 3)
+        self.add_timings(UnitTypeId.STARPORT, 3)
+        self.add_timings(UnitTypeId.PYLON, 6)
+        self.add_timings(UnitTypeId.PHOTONCANNON, 5)
+        self.add_timings(UnitTypeId.SHIELDBATTERY, 5)
+
+    # endregion
+
+    # region Debug
+
+    def do_debug(self):
+        if self.debug:
+            self.debug_store_state(self.statesr, self.action, self.reward)
+
+    def debug_store_state(self, state: List[float], action: int, reward: float):
+        if len(self.debug_data) == 0:
+            # Do headers
+            row = []
+            for sf in self.statesf:
+                row.append(sf.name)
+            row.append("Action")
+            row.append("Reward")
+            self.debug_data.append(row)
+
+        row = []
+        for data in state:
+            row.append(data)
+        row.append(action)
+        row.append(reward)
+        self.debug_data.append(row)
+
+    def debug_save_csv(self):
+        if self.debug:
+            import os
+            import csv
+
+            DATA_FOLDER = "data"
+            if not os.path.exists(DATA_FOLDER):
+                os.makedirs(DATA_FOLDER)
+            path = os.path.join(DATA_FOLDER, "data.csv")
+
+            def localize_floats(row):
+                return [str(el).replace(".", ",") if isinstance(el, float) else el for el in row]
+
+            with open(path, "w", newline="") as csvfile:
+                writer = csv.writer(csvfile, delimiter=";", quotechar='"')
+                for row in self.debug_data:
+                    writer.writerow(localize_floats(row))
+
+            # np.savetxt(os.path.join(DATA_FOLDER, "data.csv"), self.debug_data, delimiter=";")
+
+    # endregion

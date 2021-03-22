@@ -4,6 +4,7 @@ import numpy as np
 from sc2 import Result
 from sc2.position import Point2
 from sharpy.managers import ManagerBase
+from sharpy.managers.extensions import ChatManager
 from tactics.ml.agents import *
 from tactics.ml.ml_build import MlBuild
 
@@ -11,6 +12,7 @@ from tactics.ml.ml_build import MlBuild
 class BaseAgentManager(ManagerBase):
     agent: BaseMLAgent
     build: MlBuild
+    chatter: ChatManager
 
     def __init__(self, agent: str, build_str: str, build: MlBuild) -> None:
         super().__init__()
@@ -59,10 +61,11 @@ class BaseAgentManager(ManagerBase):
             "scriptonly": lambda env_name, s, a, log: SemiScriptedAgent(s, a),
         }
 
+        self.start_time = 0  # in seconds
         self.action = 0
         self.agent_dummy = agent == "scripted" or agent == "scriptonly"
         self.agent_needs_state = agent != "random" and agent != "scriptonly"
-        self.learning_rate = 0.005
+        self.learning_rate = 0.003
         self.gamma = 0.995
         self.score = 0
         self.build = build
@@ -75,11 +78,18 @@ class BaseAgentManager(ManagerBase):
         :param state: numpy array
         :return: action type integer
         """
-        self.action = self.agent.choose_action(state, self.score)
+        old_action = self.action
+        if self.build.ready_to_update:
+            self.action = self.agent.choose_action(state, self.score)
+
+        if self.action != old_action:
+            self.print(f"Agent {self.agent_name} changed action to {self.action}")
+
         return self.action
 
     async def start(self, knowledge: "Knowledge"):
         await super().start(knowledge)
+        self.chatter: ChatManager = self.knowledge.get_required_manager(ChatManager)
         self.agent = self.create_agent(knowledge.print)
         await self.build.start(knowledge)
 
@@ -88,17 +98,51 @@ class BaseAgentManager(ManagerBase):
         self.build.agent = agent
         return agent
 
+    async def chat_space(self):
+        if self.ai.time > 12:
+            await self.chatter.chat_taunt_once(
+                f"{self.key}_ml_state_space", lambda: f"State size {self.agent.state_size}"
+            )
+        if self.ai.time > 20:
+            await self.chatter.chat_taunt_once(
+                f"{self.key}_ml_action_space", lambda: f"Action size {self.agent.action_size}"
+            )
+        if self.ai.time > 25:
+            await self.chatter.chat_taunt_once(f"{self.key}_ml_actions", self.build.write_actions)
+        if self.ai.time > 40:
+            if self.agent_name == "scriptonly":
+                await self.chatter.chat_taunt_once(
+                    f"{self.key}_ml_episodes", lambda: f"Learning is disabled and this agent uses script only"
+                )
+            elif self.agent_name == "scripted":
+                await self.chatter.chat_taunt_once(
+                    f"{self.key}_ml_episodes",
+                    lambda: f"This agent uses script only but has trained for {self.agent.episode} episodes",
+                )
+            elif self.agent_name == "random_learner":
+                await self.chatter.chat_taunt_once(
+                    f"{self.key}_ml_episodes",
+                    lambda: f"This agent is random but has trained for {self.agent.episode} episodes",
+                )
+            else:
+                await self.chatter.chat_taunt_once(
+                    f"{self.key}_ml_episodes", lambda: f"This agent has trained for {self.agent.episode} episodes"
+                )
+
     async def update(self):
-        state = None
-        if self.agent_needs_state:
-            state = np.array(self.build.state)
+        if self.ai.time > self.start_time:
+            state = None
+            if self.agent_needs_state:
+                state = np.array(self.build.state)
+            self.build.calc_reward()
+            self.score = self.build.score
 
-        self.score = self.build.score
+            if self.agent_dummy:
+                self.agent.action = self.scripted_action()
 
-        if self.agent_dummy:
-            self.agent.action = self.scripted_action()
-
-        self.build.action = self.choose_action(state)
+            self.build.action = self.choose_action(state)
+        else:
+            self.build.action = self.action
         await self.build.execute()
 
     @abstractmethod

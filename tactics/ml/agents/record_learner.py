@@ -26,6 +26,7 @@ def run_learning(path: str, agent: "RecordLearner", log: Callable[[str], None]) 
 
         index += 1
         if index % 100 == 0:
+            agent.save_current_model()
             percentage = "{:.1f}".format(100 * index / count)
             log(f"Progress: {index} / {count} {percentage } %")
 
