@@ -16,13 +16,10 @@ class A3CAgent(BaseMLAgent):
 
         self.mem = Memory()
 
+    def on_start(self, state: List[Union[float, int]]):
+        self.mem.clear()
+
     def choose_action(self, state: ndarray, reward: float) -> int:
-        """
-        Choose and return the next action.
-        :param state: numpy array
-        :param reward: float as the reward value
-        :return: action type integer
-        """
         logits, _ = self.local_model(
             tf.convert_to_tensor(state[None, :],
                                  dtype=tf.float32))
@@ -33,8 +30,6 @@ class A3CAgent(BaseMLAgent):
         return action
 
     def on_end(self, state: List[Union[float, int]], reward: float):
-        """Perform any ending tasks
-        """
         pass
 
 
@@ -67,7 +62,6 @@ class Worker(threading.Thread):
         total_step = 1
         while Worker.global_episode < args.max_eps:
             current_state = self.env.reset()
-            self.agent.mem.clear()
             ep_reward = 0.
             ep_steps = 0
             self.ep_loss = 0

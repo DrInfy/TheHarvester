@@ -14,6 +14,12 @@ class BaseMLAgent(ABC):
         self.action_size: int = action_size
         self.episode: int = 0
 
+
+    @abstractmethod
+    def on_start(self, state: List[Union[float, int]]):
+        """Perform any starting tasks
+        """
+
     @abstractmethod
     def choose_action(self, state: ndarray, reward: float) -> int:
         """
