@@ -8,9 +8,10 @@ from tactics.ml.agents import BaseMLAgent
 
 
 class A3CAgent(BaseMLAgent):
-    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel, update_freq: int):
+    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel, opt, update_freq: int):
         super().__init__(state_size, action_size)
         self.global_model: ActorCriticModel = global_model
+        self.opt = opt
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
         self.update_freq = update_freq
 
@@ -31,9 +32,12 @@ class A3CAgent(BaseMLAgent):
                                  dtype=tf.float32))
         probs = tf.nn.softmax(logits)
 
-        action = np.random.choice(self.action_size, p=probs.numpy()[0])
+        self.selected_action = np.random.choice(self.action_size, p=probs.numpy()[0])
 
-        return action
+        return self.selected_action
+
+    def post_step(self, state: ndarray, reward: float):
+        pass
 
     def on_end(self, state: List[Union[float, int]], reward: float):
         pass
@@ -56,8 +60,7 @@ class Worker(threading.Thread):
                  game_name='CartPole-v0',
                  save_dir='/tmp'):
         super(Worker, self).__init__()
-        self.opt = opt
-        self.agent = A3CAgent(state_size, action_size, global_model, args.update_freq)
+        self.agent = A3CAgent(state_size, action_size, global_model, opt, args.update_freq)
         self.worker_idx = idx
         self.game_name = game_name
         self.env = gym.make(self.game_name).unwrapped
@@ -95,7 +98,7 @@ class Worker(threading.Thread):
             # Calculate local gradients
             grads = tape.gradient(total_loss, self.agent.local_model.trainable_weights)
             # Push local gradients to global model
-            self.opt.apply_gradients(zip(grads,
+            self.agent.opt.apply_gradients(zip(grads,
                                          self.agent.global_model.trainable_weights))
             # Update local model with new weights
             self.agent.local_model.set_weights(self.agent.global_model.get_weights())
