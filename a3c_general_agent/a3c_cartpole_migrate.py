@@ -15,9 +15,11 @@ class A3CAgent(BaseMLAgent):
         self.update_freq = update_freq
 
         self.mem = Memory()
+        self.time_count: int = 0
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()
+        self.time_count = 0
 
     def choose_action(self, state: ndarray, reward: float) -> int:
         logits, _ = self.local_model(
@@ -62,11 +64,11 @@ class Worker(threading.Thread):
         total_step = 1
         while Worker.global_episode < args.max_eps:
             current_state = self.env.reset()
+            self.agent.on_start(current_state)
             ep_reward = 0.
             ep_steps = 0
             self.ep_loss = 0
 
-            time_count = 0
             done = False
             while not done:
                 action = self.agent.choose_action(current_state, 0)
@@ -76,7 +78,7 @@ class Worker(threading.Thread):
                 ep_reward += reward
                 self.agent.mem.store(current_state, action, reward)
 
-                if time_count == args.update_freq or done:
+                if self.agent.time_count == args.update_freq or done:
                     # Calculate gradient wrt to local model. We do so by tracking the
                     # variables involved in computing the loss by using tf.GradientTape
                     with tf.GradientTape() as tape:
@@ -95,7 +97,7 @@ class Worker(threading.Thread):
                     self.agent.local_model.set_weights(self.agent.global_model.get_weights())
 
                     self.agent.mem.clear()
-                    time_count = 0
+                    self.agent.time_count = 0
 
                     if done:  # done and print information
                         Worker.global_moving_average_reward = \
@@ -115,7 +117,7 @@ class Worker(threading.Thread):
                         Worker.global_episode += 1
                 ep_steps += 1
 
-                time_count += 1
+                self.agent.time_count += 1
                 current_state = new_state
                 total_step += 1
 
