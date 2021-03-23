@@ -32,6 +32,8 @@ parser.add_argument('--gamma', default=0.99,
                     help='Discount factor of rewards.')
 parser.add_argument('--save-dir', default='./tmp/', type=str,
                     help='Directory in which you desire to save the model.')
+parser.add_argument('--workers', default=multiprocessing.cpu_count(), type=int,
+                    help='The number of workers to run.')
 args = parser.parse_args()
 
 
@@ -144,7 +146,7 @@ class MasterAgent():
         self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
         self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
 
-    def train(self):
+    def train(self, num_workers: int = multiprocessing.cpu_count()):
         if args.algorithm == 'random':
             random_agent = RandomAgent(self.game_name, args.max_eps)
             random_agent.run()
@@ -157,7 +159,7 @@ class MasterAgent():
                           self.global_model,
                           self.opt, res_queue,
                           i, game_name=self.game_name,
-                          save_dir=self.save_dir) for i in range(multiprocessing.cpu_count())]
+                          save_dir=self.save_dir) for i in range(num_workers)]
 
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
@@ -365,6 +367,6 @@ if __name__ == '__main__':
     print(args)
     master = MasterAgent()
     if args.train:
-        master.train()
+        master.train(args.workers)
     else:
         master.play()
