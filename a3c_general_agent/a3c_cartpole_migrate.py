@@ -152,15 +152,40 @@ if __name__ == '__main__':
     global_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
 
     # train
+    if args.train:
+        workers = [Worker(state_size,
+                          action_size,
+                          global_model,
+                          opt,
+                          i, game_name=game_name,
+                          save_dir=save_dir) for i in range(args.workers)]
 
-    workers = [Worker(state_size,
-                      action_size,
-                      global_model,
-                      opt,
-                      i, game_name=game_name,
-                      save_dir=save_dir) for i in range(args.workers)]
+        for i, worker in enumerate(workers):
+            print("Starting worker {}".format(i))
+            worker.start()
+        [w.join() for w in workers]
+    else:
+        env = gym.make(game_name).unwrapped
+        state = env.reset()
+        model = global_model
+        model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(game_name))
+        print('Loading model from: {}'.format(model_path))
+        model.load_weights(model_path)
+        done = False
+        step_counter = 0
+        reward_sum = 0
 
-    for i, worker in enumerate(workers):
-        print("Starting worker {}".format(i))
-        worker.start()
-    [w.join() for w in workers]
+        try:
+            while not done:
+                env.render(mode='rgb_array')
+                policy, value = model(tf.convert_to_tensor(state[None, :], dtype=tf.float32))
+                policy = tf.nn.softmax(policy)
+                action = np.argmax(policy)
+                state, reward, done, _ = env.step(action)
+                reward_sum += reward
+                print("{}. Reward: {}, action: {}".format(step_counter, reward_sum, action))
+                step_counter += 1
+        except KeyboardInterrupt:
+            print("Received Keyboard Interrupt. Shutting down.")
+        finally:
+            env.close()
