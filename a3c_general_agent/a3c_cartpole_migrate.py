@@ -73,8 +73,8 @@ class A3CAgent(BaseMLAgent):
                            Worker.global_moving_average_reward,
                            self.ep_loss, self.ep_steps)
                 # We must use a lock to save our model and to print to prevent data races.
-                if self.ep_reward > Worker.best_score:
-                    with Worker.save_lock:
+                with Worker.save_lock:
+                    if self.ep_reward > Worker.best_score:
                         print("Saving best model to {}, "
                               "episode score: {}".format(self.model_file_path, self.ep_reward))
                         self.global_model.save_weights(self.model_file_path)
