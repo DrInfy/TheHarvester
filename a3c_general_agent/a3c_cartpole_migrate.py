@@ -107,17 +107,13 @@ class Worker(threading.Thread):
         super(Worker, self).__init__()
         self.agent = A3CAgent(state_size, action_size, global_model, opt, args.update_freq, idx,
                               os.path.join(save_dir, 'model_{}.h5'.format(game_name)))
-        self.worker_idx = idx
-        self.game_name = game_name
-        self.env = gym.make(self.game_name).unwrapped
+        self.env = gym.make(game_name).unwrapped
         self.save_dir = save_dir
 
     def run(self):
         while Worker.global_episode < args.max_eps:
             current_state = self.env.reset()
             self.agent.on_start(current_state)
-            self.ep_loss = 0
-
             done = False
             while not done:
                 action = self.agent.choose_action(current_state, 0)
