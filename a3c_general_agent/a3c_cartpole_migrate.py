@@ -31,19 +31,29 @@ class A3CAgent(BaseMLAgent):
         self.ep_steps = 0
         self.ep_loss = 0.0
 
+        self.selected_action = None
+        self.previous_state = None
+
     def choose_action(self, state: ndarray, reward: float) -> int:
+
+        # don't do on first step
+        if self.previous_state is not None:
+            self.post_step(self.selected_action, self.previous_state, False, state, reward)
+
+
         logits, _ = self.local_model(
             tf.convert_to_tensor(state[None, :],
                                  dtype=tf.float32))
         probs = tf.nn.softmax(logits)
 
         self.selected_action = np.random.choice(self.action_size, p=probs.numpy()[0])
+        self.previous_state = state
 
         return self.selected_action
 
     def post_step(self, action, current_state, done, new_state, reward):
         if done:
-            reward = -1
+            reward = -1  # TODO: DONT USE THIS FOR SC2
         self.ep_reward += reward
         self.mem.store(current_state, action, reward)
         if self.time_count == args.update_freq or done:
@@ -85,7 +95,7 @@ class A3CAgent(BaseMLAgent):
         self.time_count += 1
 
     def on_end(self, state: List[Union[float, int]], reward: float):
-        pass
+        self.post_step(self.selected_action, self.previous_state, True, state, reward)
 
 
 class Worker(threading.Thread):
@@ -115,11 +125,12 @@ class Worker(threading.Thread):
             current_state = self.env.reset()
             self.agent.on_start(current_state)
             done = False
+            reward = 0
             while not done:
-                action = self.agent.choose_action(current_state, 0)
-                new_state, reward, done, _ = self.env.step(action)
-                self.agent.post_step(action, current_state, done, new_state, reward)
-                current_state = new_state
+                action = self.agent.choose_action(current_state, reward)
+                current_state, reward, done, _ = self.env.step(action)
+
+            self.agent.on_end(current_state, reward)
 
 
 if __name__ == '__main__':
