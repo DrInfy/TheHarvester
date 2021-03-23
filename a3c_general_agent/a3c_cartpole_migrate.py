@@ -1,10 +1,28 @@
 import threading
-
-import matplotlib.pyplot as plt
-import numpy as np
+from typing import List, Union
 
 from common import *
 
+
+class A3CAgent:
+
+    def __init__(self, state_size: int, action_size: int):
+        self.state_size = state_size
+        self.action_size = action_size
+        self.local_model = ActorCriticModel(self.state_size, self.action_size)
+
+    def step(self, current_state) -> int:
+        logits, _ = self.local_model(
+            tf.convert_to_tensor(current_state[None, :],
+                                 dtype=tf.float32))
+        probs = tf.nn.softmax(logits)
+
+        action = np.random.choice(self.action_size, p=probs.numpy()[0])
+
+        return action
+
+    def post_step(self):
+        pass
 
 class Worker(threading.Thread):
     # Set up global variables across different threads
@@ -27,7 +45,8 @@ class Worker(threading.Thread):
         self.action_size = action_size
         self.global_model = global_model
         self.opt = opt
-        self.local_model = ActorCriticModel(self.state_size, self.action_size)
+        # self.local_model = ActorCriticModel(self.state_size, self.action_size)
+        self.agent = A3CAgent(state_size, action_size)
         self.worker_idx = idx
         self.game_name = game_name
         self.env = gym.make(self.game_name).unwrapped
@@ -47,12 +66,7 @@ class Worker(threading.Thread):
             time_count = 0
             done = False
             while not done:
-                logits, _ = self.local_model(
-                    tf.convert_to_tensor(current_state[None, :],
-                                         dtype=tf.float32))
-                probs = tf.nn.softmax(logits)
-
-                action = np.random.choice(self.action_size, p=probs.numpy()[0])
+                action = self.agent.step(current_state)
                 new_state, reward, done, _ = self.env.step(action)
                 if done:
                     reward = -1
@@ -63,19 +77,19 @@ class Worker(threading.Thread):
                     # Calculate gradient wrt to local model. We do so by tracking the
                     # variables involved in computing the loss by using tf.GradientTape
                     with tf.GradientTape() as tape:
-                        total_loss = compute_loss(self.local_model,
+                        total_loss = compute_loss(self.agent.local_model,
                                                   done,
                                                   new_state,
                                                   mem,
                                                   args.gamma)
                     self.ep_loss += total_loss
                     # Calculate local gradients
-                    grads = tape.gradient(total_loss, self.local_model.trainable_weights)
+                    grads = tape.gradient(total_loss, self.agent.local_model.trainable_weights)
                     # Push local gradients to global model
                     self.opt.apply_gradients(zip(grads,
                                                  self.global_model.trainable_weights))
                     # Update local model with new weights
-                    self.local_model.set_weights(self.global_model.get_weights())
+                    self.agent.local_model.set_weights(self.global_model.get_weights())
 
                     mem.clear()
                     time_count = 0
