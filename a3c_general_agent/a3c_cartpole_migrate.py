@@ -1,19 +1,27 @@
 import threading
 from typing import List, Union
 
+from numpy.core.multiarray import ndarray
+
 from common import *
+from tactics.ml.agents import BaseMLAgent
 
 
-class A3CAgent:
-
-    def __init__(self, state_size: int, action_size: int):
-        self.state_size = state_size
-        self.action_size = action_size
+class A3CAgent(BaseMLAgent):
+    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel):
+        super().__init__(state_size, action_size)
+        self.global_model: ActorCriticModel = global_model
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
 
-    def step(self, current_state) -> int:
+    def choose_action(self, state: ndarray, reward: float) -> int:
+        """
+        Choose and return the next action.
+        :param state: numpy array
+        :param reward: float as the reward value
+        :return: action type integer
+        """
         logits, _ = self.local_model(
-            tf.convert_to_tensor(current_state[None, :],
+            tf.convert_to_tensor(state[None, :],
                                  dtype=tf.float32))
         probs = tf.nn.softmax(logits)
 
@@ -21,8 +29,11 @@ class A3CAgent:
 
         return action
 
-    def post_step(self):
+    def on_end(self, state: List[Union[float, int]], reward: float):
+        """Perform any ending tasks
+        """
         pass
+
 
 class Worker(threading.Thread):
     # Set up global variables across different threads
@@ -43,10 +54,10 @@ class Worker(threading.Thread):
         super(Worker, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
-        self.global_model = global_model
+        # self.global_model = global_model
         self.opt = opt
         # self.local_model = ActorCriticModel(self.state_size, self.action_size)
-        self.agent = A3CAgent(state_size, action_size)
+        self.agent = A3CAgent(state_size, action_size, global_model)
         self.worker_idx = idx
         self.game_name = game_name
         self.env = gym.make(self.game_name).unwrapped
@@ -66,7 +77,7 @@ class Worker(threading.Thread):
             time_count = 0
             done = False
             while not done:
-                action = self.agent.step(current_state)
+                action = self.agent.choose_action(current_state, 0)
                 new_state, reward, done, _ = self.env.step(action)
                 if done:
                     reward = -1
@@ -87,9 +98,9 @@ class Worker(threading.Thread):
                     grads = tape.gradient(total_loss, self.agent.local_model.trainable_weights)
                     # Push local gradients to global model
                     self.opt.apply_gradients(zip(grads,
-                                                 self.global_model.trainable_weights))
+                                                 self.agent.global_model.trainable_weights))
                     # Update local model with new weights
-                    self.agent.local_model.set_weights(self.global_model.get_weights())
+                    self.agent.local_model.set_weights(self.agent.global_model.get_weights())
 
                     mem.clear()
                     time_count = 0
@@ -104,7 +115,7 @@ class Worker(threading.Thread):
                             with Worker.save_lock:
                                 print("Saving best model to {}, "
                                       "episode score: {}".format(self.save_dir, ep_reward))
-                                self.global_model.save_weights(
+                                self.agent.global_model.save_weights(
                                     os.path.join(self.save_dir,
                                                  'model_{}.h5'.format(self.game_name))
                                 )
