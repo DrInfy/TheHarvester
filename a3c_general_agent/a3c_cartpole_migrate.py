@@ -19,12 +19,14 @@ class A3CAgent(BaseMLAgent):
         self.time_count: int = 0
         self.ep_reward: float = 0.
         self.ep_steps: int = 0
+        self.ep_loss: float = 0.0
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()
         self.time_count = 0
         self.ep_reward = 0.
         self.ep_steps = 0
+        self.ep_loss = 0.0
 
     def choose_action(self, state: ndarray, reward: float) -> int:
         logits, _ = self.local_model(
@@ -65,7 +67,6 @@ class Worker(threading.Thread):
         self.game_name = game_name
         self.env = gym.make(self.game_name).unwrapped
         self.save_dir = save_dir
-        self.ep_loss = 0.0
 
     def run(self):
         while Worker.global_episode < args.max_eps:
@@ -94,7 +95,7 @@ class Worker(threading.Thread):
                                           new_state,
                                           self.agent.mem,
                                           args.gamma)
-            self.ep_loss += total_loss
+            self.agent.ep_loss += total_loss
             # Calculate local gradients
             grads = tape.gradient(total_loss, self.agent.local_model.trainable_weights)
             # Push local gradients to global model
@@ -110,7 +111,7 @@ class Worker(threading.Thread):
                 Worker.global_moving_average_reward = \
                     record(Worker.global_episode, self.agent.ep_reward, self.worker_idx,
                            Worker.global_moving_average_reward,
-                           self.ep_loss, self.agent.ep_steps)
+                           self.agent.ep_loss, self.agent.ep_steps)
                 # We must use a lock to save our model and to print to prevent data races.
                 if self.agent.ep_reward > Worker.best_score:
                     with Worker.save_lock:
