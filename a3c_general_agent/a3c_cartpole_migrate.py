@@ -19,14 +19,12 @@ class Worker(threading.Thread):
                  action_size,
                  global_model,
                  opt,
-                 result_queue,
                  idx,
                  game_name='CartPole-v0',
                  save_dir='/tmp'):
         super(Worker, self).__init__()
         self.state_size = state_size
         self.action_size = action_size
-        self.result_queue = result_queue
         self.global_model = global_model
         self.opt = opt
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
@@ -85,7 +83,7 @@ class Worker(threading.Thread):
                     if done:  # done and print information
                         Worker.global_moving_average_reward = \
                             record(Worker.global_episode, ep_reward, self.worker_idx,
-                                   Worker.global_moving_average_reward, self.result_queue,
+                                   Worker.global_moving_average_reward,
                                    self.ep_loss, ep_steps)
                         # We must use a lock to save our model and to print to prevent data races.
                         if ep_reward > Worker.best_score:
@@ -103,7 +101,6 @@ class Worker(threading.Thread):
                 time_count += 1
                 current_state = new_state
                 total_step += 1
-        self.result_queue.put(None)
 
 
 if __name__ == '__main__':
@@ -125,32 +122,15 @@ if __name__ == '__main__':
     global_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
 
     # train
-    
-    res_queue = Queue()
 
     workers = [Worker(state_size,
                       action_size,
                       global_model,
-                      opt, res_queue,
+                      opt,
                       i, game_name=game_name,
                       save_dir=save_dir) for i in range(args.workers)]
 
     for i, worker in enumerate(workers):
         print("Starting worker {}".format(i))
         worker.start()
-
-    moving_average_rewards = []  # record episode reward to plot
-    while True:
-        reward = res_queue.get()
-        if reward is not None:
-            moving_average_rewards.append(reward)
-        else:
-            break
     [w.join() for w in workers]
-
-    plt.plot(moving_average_rewards)
-    plt.ylabel('Moving average ep reward')
-    plt.xlabel('Step')
-    plt.savefig(os.path.join(save_dir,
-                             '{} Moving Average.png'.format(game_name)))
-    plt.show()

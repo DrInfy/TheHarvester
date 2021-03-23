@@ -58,7 +58,6 @@ def record(episode,
            episode_reward,
            worker_idx,
            global_ep_reward,
-           result_queue,
            total_loss,
            num_steps):
     """Helper function to store score and print statistics.
@@ -68,7 +67,6 @@ def record(episode,
       episode_reward: Reward accumulated over the current episode
       worker_idx: Which thread (worker)
       global_ep_reward: The moving average of the global reward
-      result_queue: Queue storing the moving average of the scores
       total_loss: The total loss accumualted over the current episode
       num_steps: The number of steps the episode took to complete
     """
@@ -84,7 +82,6 @@ def record(episode,
         f"Steps: {num_steps} | "
         f"Worker: {worker_idx}"
     )
-    result_queue.put(global_ep_reward)
     return global_ep_reward
 
 
