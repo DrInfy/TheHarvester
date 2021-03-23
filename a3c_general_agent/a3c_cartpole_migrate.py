@@ -1,4 +1,3 @@
-import os
 from queue import Queue
 from typing import List, Union
 
@@ -7,7 +6,26 @@ import tensorflow as tf
 from tensorflow.python import keras
 from tensorflow.python.keras import layers
 
-from zergbot.ml.agents import BaseMLAgent
+from tactics.ml.agents import BaseMLAgent
+
+
+class ActorCriticModel(keras.Model):
+    def __init__(self, state_size, action_size):
+        super(ActorCriticModel, self).__init__()
+        self.state_size = state_size
+        self.action_size = action_size
+        self.dense1 = layers.Dense(100, activation='relu')
+        self.policy_logits = layers.Dense(action_size)
+        self.dense2 = layers.Dense(100, activation='relu')
+        self.values = layers.Dense(1)
+
+    def call(self, inputs):
+        # Forward pass
+        x = self.dense1(inputs)
+        logits = self.policy_logits(x)
+        v1 = self.dense2(inputs)
+        values = self.values(v1)
+        return logits, values
 
 
 def record(episode,
@@ -32,36 +50,16 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    tmp = int(total_loss / float(num_steps) * 1000) / 1000
     print(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
-        f"Loss: {tmp} | "
+        f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
         f"Steps: {num_steps} | "
         f"Worker: {worker_idx}"
     )
     result_queue.put(global_ep_reward)
     return global_ep_reward
-
-
-class ActorCriticModel(keras.Model):
-    def __init__(self, state_size, action_size):
-        super(ActorCriticModel, self).__init__()
-        self.state_size = state_size
-        self.action_size = action_size
-        self.dense1 = layers.Dense(100, activation='relu')
-        self.policy_logits = layers.Dense(action_size)
-        self.dense2 = layers.Dense(100, activation='relu')
-        self.values = layers.Dense(1)
-
-    def call(self, inputs):
-        # Forward pass
-        x = self.dense1(inputs)
-        logits = self.policy_logits(x)
-        v1 = self.dense2(inputs)
-        values = self.values(v1)
-        return logits, values
 
 
 class Memory:
@@ -171,9 +169,9 @@ class A3CAgent(BaseMLAgent):
         if self.ep_reward > A3CAgent.best_score:
             # with Worker.save_lock:
             print("Saving best model to {}, "
-                  "episode score: {}".format('tmp', self.ep_reward))
+                  "episode score: {}".format('./data', self.ep_reward))
             self.global_model.save_weights(
-                os.path.join('tmp',
+                os.path.join('./data',
                              'model_{}.h5'.format('cartpole'))
             )
             # Worker.best_score = ep_reward
@@ -229,3 +227,17 @@ class A3CAgent(BaseMLAgent):
         policy_loss -= 0.01 * entropy
         total_loss = tf.reduce_mean((0.5 * value_loss + policy_loss))
         return total_loss
+
+
+import os
+from tactics.ml.environments.cartpole_env import CartPoleEnv
+
+STOP_FILE: str = "runner-stop.txt"
+
+if __name__ == '__main__':
+    tf.enable_eager_execution()
+    # with tf.device('/cpu:0'):  # use CPU instead of GPU
+    while not os.path.isfile(STOP_FILE):
+        agent = A3CAgent(4, 2)
+        env = CartPoleEnv(agent.choose_action, agent.on_end)
+        env.run()

@@ -1,7 +1,7 @@
 from typing import Callable
 import gym
 
-from tactics.ml import BaseEnv
+from tactics.ml.environments.base_env import BaseEnv
 
 
 class CartPoleEnv(BaseEnv):
