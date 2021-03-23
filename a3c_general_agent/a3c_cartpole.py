@@ -163,7 +163,7 @@ class Worker(threading.Thread):
                     if done:  # done and print information
                         Worker.global_moving_average_reward = \
                             record(Worker.global_episode, ep_reward, self.worker_idx,
-                                   Worker.global_moving_average_reward, self.result_queue,
+                                   Worker.global_moving_average_reward, # self.result_queue,
                                    self.ep_loss, ep_steps)
                         # We must use a lock to save our model and to print to prevent data races.
                         if ep_reward > Worker.best_score:
