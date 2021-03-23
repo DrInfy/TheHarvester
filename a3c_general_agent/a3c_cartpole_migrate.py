@@ -1,9 +1,9 @@
 import threading
 
-from common import *
-
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+
+from common import *
 
 
 class Worker(threading.Thread):
@@ -65,10 +65,11 @@ class Worker(threading.Thread):
                     # Calculate gradient wrt to local model. We do so by tracking the
                     # variables involved in computing the loss by using tf.GradientTape
                     with tf.GradientTape() as tape:
-                        total_loss = self.compute_loss(done,
-                                                       new_state,
-                                                       mem,
-                                                       args.gamma)
+                        total_loss = compute_loss(self.local_model,
+                                                  done,
+                                                  new_state,
+                                                  mem,
+                                                  args.gamma)
                     self.ep_loss += total_loss
                     # Calculate local gradients
                     grads = tape.gradient(total_loss, self.local_model.trainable_weights)
@@ -104,48 +105,9 @@ class Worker(threading.Thread):
                 total_step += 1
         self.result_queue.put(None)
 
-    def compute_loss(self,
-                     done,
-                     new_state,
-                     memory,
-                     gamma=0.99):
-        if done:
-            reward_sum = 0.  # terminal
-        else:
-            reward_sum = self.local_model(
-                tf.convert_to_tensor(new_state[None, :],
-                                     dtype=tf.float32))[-1].numpy()[0]
-
-        # Get discounted rewards
-        discounted_rewards = []
-        for reward in memory.rewards[::-1]:  # reverse buffer r
-            reward_sum = reward + gamma * reward_sum
-            discounted_rewards.append(reward_sum)
-        discounted_rewards.reverse()
-
-        logits, values = self.local_model(
-            tf.convert_to_tensor(np.vstack(memory.states),
-                                 dtype=tf.float32))
-        # Get our advantages
-        advantage = tf.convert_to_tensor(np.array(discounted_rewards)[:, None],
-                                         dtype=tf.float32) - values
-        # Value loss
-        value_loss = advantage ** 2
-
-        # Calculate our policy loss
-        policy = tf.nn.softmax(logits)
-        entropy = tf.nn.softmax_cross_entropy_with_logits(labels=policy, logits=logits)
-
-        policy_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=memory.actions,
-                                                                     logits=logits)
-        policy_loss *= tf.stop_gradient(advantage)
-        policy_loss -= 0.01 * entropy
-        total_loss = tf.reduce_mean((0.5 * value_loss + policy_loss))
-        return total_loss
-
 
 if __name__ == '__main__':
-    
+
     # __init__
     game_name = 'CartPole-v0'
     save_dir = args.save_dir
@@ -163,24 +125,20 @@ if __name__ == '__main__':
     global_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
 
     # train
-    if args.algorithm == 'random':
-        random_agent = RandomAgent(game_name, args.max_eps)
-        random_agent.run()
-        exit
     
     res_queue = Queue()
-    
+
     workers = [Worker(state_size,
                       action_size,
                       global_model,
                       opt, res_queue,
                       i, game_name=game_name,
                       save_dir=save_dir) for i in range(args.workers)]
-    
+
     for i, worker in enumerate(workers):
         print("Starting worker {}".format(i))
         worker.start()
-    
+
     moving_average_rewards = []  # record episode reward to plot
     while True:
         reward = res_queue.get()
@@ -189,7 +147,7 @@ if __name__ == '__main__':
         else:
             break
     [w.join() for w in workers]
-    
+
     plt.plot(moving_average_rewards)
     plt.ylabel('Moving average ep reward')
     plt.xlabel('Step')
