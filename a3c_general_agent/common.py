@@ -74,11 +74,13 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
+    tmp = total_loss / float(num_steps) * 1000
+    tmp = int(tmp) / 1000
     print(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
-        f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
+        f"Loss: {tmp} | "
         f"Steps: {num_steps} | "
         f"Worker: {worker_idx}"
     )

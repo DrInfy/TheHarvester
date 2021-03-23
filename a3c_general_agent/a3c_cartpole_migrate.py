@@ -16,10 +16,12 @@ class A3CAgent(BaseMLAgent):
 
         self.mem = Memory()
         self.time_count: int = 0
+        self.ep_reward: float = 0.
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()
         self.time_count = 0
+        self.ep_reward = 0.
 
     def choose_action(self, state: ndarray, reward: float) -> int:
         logits, _ = self.local_model(
@@ -65,7 +67,6 @@ class Worker(threading.Thread):
         while Worker.global_episode < args.max_eps:
             current_state = self.env.reset()
             self.agent.on_start(current_state)
-            ep_reward = 0.
             ep_steps = 0
             self.ep_loss = 0
 
@@ -73,53 +74,55 @@ class Worker(threading.Thread):
             while not done:
                 action = self.agent.choose_action(current_state, 0)
                 new_state, reward, done, _ = self.env.step(action)
-                if done:
-                    reward = -1
-                ep_reward += reward
-                self.agent.mem.store(current_state, action, reward)
-
-                if self.agent.time_count == args.update_freq or done:
-                    # Calculate gradient wrt to local model. We do so by tracking the
-                    # variables involved in computing the loss by using tf.GradientTape
-                    with tf.GradientTape() as tape:
-                        total_loss = compute_loss(self.agent.local_model,
-                                                  done,
-                                                  new_state,
-                                                  self.agent.mem,
-                                                  args.gamma)
-                    self.ep_loss += total_loss
-                    # Calculate local gradients
-                    grads = tape.gradient(total_loss, self.agent.local_model.trainable_weights)
-                    # Push local gradients to global model
-                    self.opt.apply_gradients(zip(grads,
-                                                 self.agent.global_model.trainable_weights))
-                    # Update local model with new weights
-                    self.agent.local_model.set_weights(self.agent.global_model.get_weights())
-
-                    self.agent.mem.clear()
-                    self.agent.time_count = 0
-
-                    if done:  # done and print information
-                        Worker.global_moving_average_reward = \
-                            record(Worker.global_episode, ep_reward, self.worker_idx,
-                                   Worker.global_moving_average_reward,
-                                   self.ep_loss, ep_steps)
-                        # We must use a lock to save our model and to print to prevent data races.
-                        if ep_reward > Worker.best_score:
-                            with Worker.save_lock:
-                                print("Saving best model to {}, "
-                                      "episode score: {}".format(self.save_dir, ep_reward))
-                                self.agent.global_model.save_weights(
-                                    os.path.join(self.save_dir,
-                                                 'model_{}.h5'.format(self.game_name))
-                                )
-                                Worker.best_score = ep_reward
-                        Worker.global_episode += 1
+                self.method_name(action, current_state, done, ep_steps, new_state, reward)
                 ep_steps += 1
 
                 self.agent.time_count += 1
                 current_state = new_state
                 total_step += 1
+
+    def method_name(self, action, current_state, done, ep_steps, new_state, reward):
+        if done:
+            reward = -1
+        self.agent.ep_reward += reward
+        self.agent.mem.store(current_state, action, reward)
+        if self.agent.time_count == args.update_freq or done:
+            # Calculate gradient wrt to local model. We do so by tracking the
+            # variables involved in computing the loss by using tf.GradientTape
+            with tf.GradientTape() as tape:
+                total_loss = compute_loss(self.agent.local_model,
+                                          done,
+                                          new_state,
+                                          self.agent.mem,
+                                          args.gamma)
+            self.ep_loss += total_loss
+            # Calculate local gradients
+            grads = tape.gradient(total_loss, self.agent.local_model.trainable_weights)
+            # Push local gradients to global model
+            self.opt.apply_gradients(zip(grads,
+                                         self.agent.global_model.trainable_weights))
+            # Update local model with new weights
+            self.agent.local_model.set_weights(self.agent.global_model.get_weights())
+
+            self.agent.mem.clear()
+            self.agent.time_count = 0
+
+            if done:  # done and print information
+                Worker.global_moving_average_reward = \
+                    record(Worker.global_episode, self.agent.ep_reward, self.worker_idx,
+                           Worker.global_moving_average_reward,
+                           self.ep_loss, ep_steps)
+                # We must use a lock to save our model and to print to prevent data races.
+                if self.agent.ep_reward > Worker.best_score:
+                    with Worker.save_lock:
+                        print("Saving best model to {}, "
+                              "episode score: {}".format(self.save_dir, self.agent.ep_reward))
+                        self.agent.global_model.save_weights(
+                            os.path.join(self.save_dir,
+                                         'model_{}.h5'.format(self.game_name))
+                        )
+                        Worker.best_score = self.agent.ep_reward
+                Worker.global_episode += 1
 
 
 if __name__ == '__main__':
