@@ -8,7 +8,8 @@ from tactics.ml.agents import BaseMLAgent
 
 
 class A3CAgent(BaseMLAgent):
-    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel, opt, update_freq: int, agent_id: int, model_file_path):
+    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel, opt, update_freq: int,
+                 agent_id: int, model_file_path):
         super().__init__(state_size, action_size)
         self.global_model: ActorCriticModel = global_model
         self.opt = opt
@@ -39,7 +40,6 @@ class A3CAgent(BaseMLAgent):
         # don't do on first step
         if self.previous_state is not None:
             self.post_step(self.selected_action, self.previous_state, False, state, reward)
-
 
         logits, _ = self.local_model(
             tf.convert_to_tensor(state[None, :],
@@ -98,6 +98,62 @@ class A3CAgent(BaseMLAgent):
         self.post_step(self.selected_action, self.previous_state, True, state, reward)
 
 
+class MasterAgent():
+    def __init__(self):
+        self.game_name = 'CartPole-v0'
+        self.save_dir = args.save_dir
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+
+        env = gym.make(self.game_name)
+        self.state_size = env.observation_space.shape[0]
+        self.action_size = env.action_space.n
+        self.opt = tf.compat.v1.train.AdamOptimizer(args.lr, use_locking=True)
+        print(self.state_size, self.action_size)
+
+        self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
+        self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+
+    def train(self, num_workers: int = multiprocessing.cpu_count()):
+        workers = [Worker(self.state_size,
+                          self.action_size,
+                          self.global_model,
+                          self.opt,
+                          i, game_name=self.game_name,
+                          save_dir=self.save_dir) for i in range(args.workers)]
+
+        for i, worker in enumerate(workers):
+            print("Starting worker {}".format(i))
+            worker.start()
+        [w.join() for w in workers]
+
+    def play(self):
+        env = gym.make(self.game_name).unwrapped
+        state = env.reset()
+        model = self.global_model
+        model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(self.game_name))
+        print('Loading model from: {}'.format(model_path))
+        model.load_weights(model_path)
+        done = False
+        step_counter = 0
+        reward_sum = 0
+
+        try:
+            while not done:
+                env.render(mode='rgb_array')
+                policy, value = model(tf.convert_to_tensor(state[None, :], dtype=tf.float32))
+                policy = tf.nn.softmax(policy)
+                action = np.argmax(policy)
+                state, reward, done, _ = env.step(action)
+                reward_sum += reward
+                print("{}. Reward: {}, action: {}".format(step_counter, reward_sum, action))
+                step_counter += 1
+        except KeyboardInterrupt:
+            print("Received Keyboard Interrupt. Shutting down.")
+        finally:
+            env.close()
+
+
 class Worker(threading.Thread):
     # Set up global variables across different threads
     global_episode = 0
@@ -134,58 +190,8 @@ class Worker(threading.Thread):
 
 
 if __name__ == '__main__':
-
-    # __init__
-    game_name = 'CartPole-v0'
-    save_dir = args.save_dir
-    save_dir = save_dir
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    env = gym.make(game_name)
-    state_size = env.observation_space.shape[0]
-    action_size = env.action_space.n
-    opt = tf.compat.v1.train.AdamOptimizer(args.lr, use_locking=True)
-    print(state_size, action_size)
-
-    global_model = ActorCriticModel(state_size, action_size)  # global network
-    global_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
-
-    # train
+    agent = MasterAgent()
     if args.train:
-        workers = [Worker(state_size,
-                          action_size,
-                          global_model,
-                          opt,
-                          i, game_name=game_name,
-                          save_dir=save_dir) for i in range(args.workers)]
-
-        for i, worker in enumerate(workers):
-            print("Starting worker {}".format(i))
-            worker.start()
-        [w.join() for w in workers]
+        agent.train()
     else:
-        env = gym.make(game_name).unwrapped
-        state = env.reset()
-        model = global_model
-        model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(game_name))
-        print('Loading model from: {}'.format(model_path))
-        model.load_weights(model_path)
-        done = False
-        step_counter = 0
-        reward_sum = 0
-
-        try:
-            while not done:
-                env.render(mode='rgb_array')
-                policy, value = model(tf.convert_to_tensor(state[None, :], dtype=tf.float32))
-                policy = tf.nn.softmax(policy)
-                action = np.argmax(policy)
-                state, reward, done, _ = env.step(action)
-                reward_sum += reward
-                print("{}. Reward: {}, action: {}".format(step_counter, reward_sum, action))
-                step_counter += 1
-        except KeyboardInterrupt:
-            print("Received Keyboard Interrupt. Shutting down.")
-        finally:
-            env.close()
+        agent.play()
