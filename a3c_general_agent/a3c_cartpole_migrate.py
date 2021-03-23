@@ -8,10 +8,13 @@ from tactics.ml.agents import BaseMLAgent
 
 
 class A3CAgent(BaseMLAgent):
-    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel):
+    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel, update_freq: int):
         super().__init__(state_size, action_size)
         self.global_model: ActorCriticModel = global_model
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
+        self.update_freq = update_freq
+
+        self.mem = Memory()
 
     def choose_action(self, state: ndarray, reward: float) -> int:
         """
@@ -52,12 +55,8 @@ class Worker(threading.Thread):
                  game_name='CartPole-v0',
                  save_dir='/tmp'):
         super(Worker, self).__init__()
-        self.state_size = state_size
-        self.action_size = action_size
-        # self.global_model = global_model
         self.opt = opt
-        # self.local_model = ActorCriticModel(self.state_size, self.action_size)
-        self.agent = A3CAgent(state_size, action_size, global_model)
+        self.agent = A3CAgent(state_size, action_size, global_model, args.update_freq)
         self.worker_idx = idx
         self.game_name = game_name
         self.env = gym.make(self.game_name).unwrapped
@@ -66,10 +65,9 @@ class Worker(threading.Thread):
 
     def run(self):
         total_step = 1
-        mem = Memory()
         while Worker.global_episode < args.max_eps:
             current_state = self.env.reset()
-            mem.clear()
+            self.agent.mem.clear()
             ep_reward = 0.
             ep_steps = 0
             self.ep_loss = 0
@@ -82,7 +80,7 @@ class Worker(threading.Thread):
                 if done:
                     reward = -1
                 ep_reward += reward
-                mem.store(current_state, action, reward)
+                self.agent.mem.store(current_state, action, reward)
 
                 if time_count == args.update_freq or done:
                     # Calculate gradient wrt to local model. We do so by tracking the
@@ -91,7 +89,7 @@ class Worker(threading.Thread):
                         total_loss = compute_loss(self.agent.local_model,
                                                   done,
                                                   new_state,
-                                                  mem,
+                                                  self.agent.mem,
                                                   args.gamma)
                     self.ep_loss += total_loss
                     # Calculate local gradients
@@ -102,7 +100,7 @@ class Worker(threading.Thread):
                     # Update local model with new weights
                     self.agent.local_model.set_weights(self.agent.global_model.get_weights())
 
-                    mem.clear()
+                    self.agent.mem.clear()
                     time_count = 0
 
                     if done:  # done and print information
