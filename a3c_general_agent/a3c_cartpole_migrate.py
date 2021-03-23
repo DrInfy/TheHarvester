@@ -17,11 +17,13 @@ class A3CAgent(BaseMLAgent):
         self.mem = Memory()
         self.time_count: int = 0
         self.ep_reward: float = 0.
+        self.ep_steps: int = 0
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()
         self.time_count = 0
         self.ep_reward = 0.
+        self.ep_steps = 0
 
     def choose_action(self, state: ndarray, reward: float) -> int:
         logits, _ = self.local_model(
@@ -63,25 +65,19 @@ class Worker(threading.Thread):
         self.ep_loss = 0.0
 
     def run(self):
-        total_step = 1
         while Worker.global_episode < args.max_eps:
             current_state = self.env.reset()
             self.agent.on_start(current_state)
-            ep_steps = 0
             self.ep_loss = 0
 
             done = False
             while not done:
                 action = self.agent.choose_action(current_state, 0)
                 new_state, reward, done, _ = self.env.step(action)
-                self.method_name(action, current_state, done, ep_steps, new_state, reward)
-                ep_steps += 1
-
-                self.agent.time_count += 1
+                self.method_name(action, current_state, done, new_state, reward)
                 current_state = new_state
-                total_step += 1
 
-    def method_name(self, action, current_state, done, ep_steps, new_state, reward):
+    def method_name(self, action, current_state, done, new_state, reward):
         if done:
             reward = -1
         self.agent.ep_reward += reward
@@ -111,7 +107,7 @@ class Worker(threading.Thread):
                 Worker.global_moving_average_reward = \
                     record(Worker.global_episode, self.agent.ep_reward, self.worker_idx,
                            Worker.global_moving_average_reward,
-                           self.ep_loss, ep_steps)
+                           self.ep_loss, self.agent.ep_steps)
                 # We must use a lock to save our model and to print to prevent data races.
                 if self.agent.ep_reward > Worker.best_score:
                     with Worker.save_lock:
@@ -123,6 +119,9 @@ class Worker(threading.Thread):
                         )
                         Worker.best_score = self.agent.ep_reward
                 Worker.global_episode += 1
+        self.agent.ep_steps += 1
+
+        self.agent.time_count += 1
 
 
 if __name__ == '__main__':
