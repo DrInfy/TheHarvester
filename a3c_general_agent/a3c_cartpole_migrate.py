@@ -9,10 +9,10 @@ from tactics.ml.agents import BaseMLAgent
 
 SAVE_DIR = "./data/"
 MODEL_NAME = 'model'
-MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
+MODEL_FILE_NAME = f'{MODEL_NAME}.tf'
 MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
 MODEL_FILE_LOCK_PATH = f'{MODEL_FILE_PATH}.lock'
-BEST_MODEL_FILE_NAME = f'{MODEL_NAME}_best.h5'
+BEST_MODEL_FILE_NAME = f'{MODEL_NAME}_best.tf'
 BEST_MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
 BEST_MODEL_FILE_LOCK_PATH = f'{BEST_MODEL_FILE_PATH}.lock'
 OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
@@ -88,13 +88,15 @@ class A3CAgent(BaseMLAgent):
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
 
             with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
-                global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
+                global_model = tf.keras.models.load_model(MODEL_FILE_PATH)
+                # global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
                 # Push local gradients to global model
-                self.opt.apply_gradients(zip(grads,
+                global_model.optimizer.apply_gradients(zip(grads,
                                              global_model.trainable_weights))
                 # Update local model with new weights
                 self.local_model.set_weights(global_model.get_weights())
-                global_model.save_weights(MODEL_FILE_PATH)
+                # global_model.save_weights(MODEL_FILE_PATH)
+                global_model.save(MODEL_FILE_PATH)
 
             self.mem.clear()
             self.time_count = 0
@@ -116,7 +118,7 @@ class MasterAgent():
         env = gym.make(self.game_name)
         self.state_size = env.observation_space.shape[0]
         self.action_size = env.action_space.n
-        self.opt = tf.compat.v1.train.AdamOptimizer(args.lr, use_locking=True)
+        self.opt = tf.keras.optimizers.Adam(args.lr)
         print(self.state_size, self.action_size)
 
         # If the model doesn't yet exist, create it
@@ -125,7 +127,10 @@ class MasterAgent():
                 print(f"Model weights not found.\nCreating new weights file at {MODEL_FILE_PATH}")
                 global_model = ActorCriticModel(self.state_size, self.action_size)
                 global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-                global_model.save_weights(MODEL_FILE_PATH)
+                # global_model.save_weights(MODEL_FILE_PATH)
+                # global_model.save(MODEL_FILE_PATH)
+                global_model.compile(optimizer=self.opt)
+                tf.keras.models.save_model(global_model, MODEL_FILE_PATH)
 
         # self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
         # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))

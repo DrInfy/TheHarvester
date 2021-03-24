@@ -12,7 +12,7 @@ from tensorflow.python import keras
 from tensorflow.python.keras import layers
 import numpy as np
 
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 parser = argparse.ArgumentParser(description='Run A3C algorithm on the game '
                                              'Cartpole.')
