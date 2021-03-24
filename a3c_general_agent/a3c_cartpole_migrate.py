@@ -1,4 +1,5 @@
 import threading
+import time
 from typing import List, Union
 
 from filelock import FileLock
@@ -7,7 +8,7 @@ from numpy.core.multiarray import ndarray
 from common import *
 from tactics.ml.agents import BaseMLAgent
 
-SAVE_DIR = "./data/"
+SAVE_DIR = f'./data/{time.strftime("%Y%m%d-%H%M%S")}'
 MODEL_NAME = 'model'
 MODEL_FILE_NAME = f'{MODEL_NAME}.tf'
 MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
@@ -111,7 +112,7 @@ class A3CAgent(BaseMLAgent):
 class MasterAgent():
     def __init__(self):
         self.game_name = 'CartPole-v0'
-        self.save_dir = args.save_dir
+        self.save_dir = SAVE_DIR
         if not os.path.exists(self.save_dir):
             os.makedirs(self.save_dir)
 
