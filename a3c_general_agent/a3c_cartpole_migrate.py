@@ -26,12 +26,12 @@ class A3CAgent(BaseMLAgent):
                  agent_id: int, model_file_path):
         super().__init__(state_size, action_size)
 
-        with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
-            self.local_model = load_model(state_size, action_size, MODEL_FILE_PATH)
+        # with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
+        #     self.local_model = load_model(state_size, action_size, MODEL_FILE_PATH)
 
         # self.global_model: ActorCriticModel = global_model
         self.opt = opt
-        # self.local_model = ActorCriticModel(self.state_size, self.action_size)
+        self.local_model = ActorCriticModel(self.state_size, self.action_size)
         self.update_freq = update_freq
 
         self.mem = Memory()
