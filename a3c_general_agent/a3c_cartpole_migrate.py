@@ -76,20 +76,6 @@ class A3CAgent(BaseMLAgent):
 
             self.mem.clear()
             self.time_count = 0
-
-            if done:  # done and print information
-                Worker.global_moving_average_reward = \
-                    record(Worker.global_episode, self.ep_reward, self.agent_id,
-                           Worker.global_moving_average_reward,
-                           self.ep_loss, self.ep_steps)
-                # We must use a lock to save our model and to print to prevent data races.
-                with Worker.save_lock:
-                    if self.ep_reward > Worker.best_score:
-                        print("Saving best model to {}, "
-                              "episode score: {}".format(self.model_file_path, self.ep_reward))
-                        self.global_model.save_weights(self.model_file_path)
-                        Worker.best_score = self.ep_reward
-                Worker.global_episode += 1
         self.ep_steps += 1
 
         self.time_count += 1
@@ -187,6 +173,19 @@ class Worker(threading.Thread):
                 current_state, reward, done, _ = self.env.step(action)
 
             self.agent.on_end(current_state, reward)
+
+            Worker.global_moving_average_reward = \
+                record(Worker.global_episode, self.agent.ep_reward, self.agent.agent_id,
+                       Worker.global_moving_average_reward,
+                       self.agent.ep_loss, self.agent.ep_steps)
+            # We must use a lock to save our model and to print to prevent data races.
+            with Worker.save_lock:
+                if self.agent.ep_reward > Worker.best_score:
+                    print("Saving best model to {}, "
+                          "episode score: {}".format(self.agent.model_file_path, self.agent.ep_reward))
+                    self.agent.global_model.save_weights(self.agent.model_file_path)
+                    Worker.best_score = self.agent.ep_reward
+            Worker.global_episode += 1
 
 
 if __name__ == '__main__':
