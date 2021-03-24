@@ -1,19 +1,37 @@
 import threading
 from typing import List, Union
 
+from filelock import FileLock
 from numpy.core.multiarray import ndarray
 
 from common import *
 from tactics.ml.agents import BaseMLAgent
 
+SAVE_DIR = "./data/"
+MODEL_NAME = 'model'
+MODEL_FILE_NAME = f'{MODEL_NAME}.h5'
+MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+MODEL_FILE_LOCK_PATH = f'{MODEL_FILE_PATH}.lock'
+BEST_MODEL_FILE_NAME = f'{MODEL_NAME}_best.h5'
+BEST_MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
+BEST_MODEL_FILE_LOCK_PATH = f'{BEST_MODEL_FILE_PATH}.lock'
+OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
+OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
+
 
 class A3CAgent(BaseMLAgent):
-    def __init__(self, state_size: int, action_size: int, global_model: ActorCriticModel, opt, update_freq: int,
+    def __init__(self, state_size: int, action_size: int,
+                 # global_model: ActorCriticModel,
+                 opt, update_freq: int,
                  agent_id: int, model_file_path):
         super().__init__(state_size, action_size)
-        self.global_model: ActorCriticModel = global_model
+
+        with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
+            self.local_model = load_model(state_size, action_size, MODEL_FILE_PATH)
+
+        # self.global_model: ActorCriticModel = global_model
         self.opt = opt
-        self.local_model = ActorCriticModel(self.state_size, self.action_size)
+        # self.local_model = ActorCriticModel(self.state_size, self.action_size)
         self.update_freq = update_freq
 
         self.mem = Memory()
@@ -68,11 +86,15 @@ class A3CAgent(BaseMLAgent):
             self.ep_loss += total_loss
             # Calculate local gradients
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
-            # Push local gradients to global model
-            self.opt.apply_gradients(zip(grads,
-                                         self.global_model.trainable_weights))
-            # Update local model with new weights
-            self.local_model.set_weights(self.global_model.get_weights())
+
+            with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
+                global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
+                # Push local gradients to global model
+                self.opt.apply_gradients(zip(grads,
+                                             global_model.trainable_weights))
+                # Update local model with new weights
+                self.local_model.set_weights(global_model.get_weights())
+                global_model.save_weights(MODEL_FILE_PATH)
 
             self.mem.clear()
             self.time_count = 0
@@ -97,13 +119,21 @@ class MasterAgent():
         self.opt = tf.compat.v1.train.AdamOptimizer(args.lr, use_locking=True)
         print(self.state_size, self.action_size)
 
-        self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
-        self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+        # If the model doesn't yet exist, create it
+        with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
+            if not os.path.isfile(MODEL_FILE_PATH):
+                print(f"Model weights not found.\nCreating new weights file at {MODEL_FILE_PATH}")
+                global_model = ActorCriticModel(self.state_size, self.action_size)
+                global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+                global_model.save_weights(MODEL_FILE_PATH)
+
+        # self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
+        # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
 
     def train(self, num_workers: int = multiprocessing.cpu_count()):
         workers = [Worker(self.state_size,
                           self.action_size,
-                          self.global_model,
+                          # self.global_model,
                           self.opt,
                           i, game_name=self.game_name,
                           save_dir=self.save_dir) for i in range(args.workers)]
@@ -116,7 +146,9 @@ class MasterAgent():
     def play(self):
         env = gym.make(self.game_name).unwrapped
         state = env.reset()
-        model = self.global_model
+        # model = self.global_model
+        with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
+            model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
         model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(self.game_name))
         print('Loading model from: {}'.format(model_path))
         model.load_weights(model_path)
@@ -151,13 +183,15 @@ class Worker(threading.Thread):
     def __init__(self,
                  state_size,
                  action_size,
-                 global_model,
+                 # global_model,
                  opt,
                  idx,
                  game_name='CartPole-v0',
                  save_dir='/tmp'):
         super(Worker, self).__init__()
-        self.agent = A3CAgent(state_size, action_size, global_model, opt, args.update_freq, idx,
+        self.agent = A3CAgent(state_size, action_size,
+                              # global_model,
+                              opt, args.update_freq, idx,
                               os.path.join(save_dir, 'model_{}.h5'.format(game_name)))
         self.env = gym.make(game_name).unwrapped
         self.save_dir = save_dir
@@ -179,11 +213,12 @@ class Worker(threading.Thread):
                        Worker.global_moving_average_reward,
                        self.agent.ep_loss, self.agent.ep_steps)
             # We must use a lock to save our model and to print to prevent data races.
-            with Worker.save_lock:
+
+            with FileLock(BEST_MODEL_FILE_LOCK_PATH, timeout=99999):
                 if self.agent.ep_reward > Worker.best_score:
                     print("Saving best model to {}, "
-                          "episode score: {}".format(self.agent.model_file_path, self.agent.ep_reward))
-                    self.agent.global_model.save_weights(self.agent.model_file_path)
+                          "episode score: {}".format(BEST_MODEL_FILE_PATH, self.agent.ep_reward))
+                    self.agent.local_model.save_weights(BEST_MODEL_FILE_PATH)
                     Worker.best_score = self.agent.ep_reward
             Worker.global_episode += 1
 

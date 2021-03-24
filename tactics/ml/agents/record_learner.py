@@ -4,7 +4,7 @@ import os
 from os.path import isfile, join
 from typing import Callable, List, Tuple, Union
 
-from filelock.filelock import FileLock
+from filelock import FileLock
 from tactics.ml.agents import A3CAgent
 from tactics.ml.agents.a3c_agent import record
 

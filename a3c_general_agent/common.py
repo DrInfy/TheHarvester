@@ -140,6 +140,7 @@ class Memory:
         self.actions = []
         self.rewards = []
 
+
 def compute_loss(local_model,
                  done,
                  new_state,
@@ -178,3 +179,10 @@ def compute_loss(local_model,
     policy_loss -= 0.01 * entropy
     total_loss = tf.reduce_mean((0.5 * value_loss + policy_loss))
     return total_loss
+
+
+def load_model(state_size: int, action_size: int, model_file_path: str):
+    model = ActorCriticModel(state_size, action_size)
+    model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
+    model.load_weights(model_file_path)
+    return model

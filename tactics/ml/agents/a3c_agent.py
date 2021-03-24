@@ -8,11 +8,11 @@ from typing import List, Union, Callable, Tuple
 
 import numpy as np
 import tensorflow as tf
+from filelock import FileLock
 from tensorflow.python import keras
 from tensorflow.python.keras import layers
 
 import jsonpickle
-from filelock.filelock import FileLock
 from tactics.ml.agents import BaseMLAgent
 from numpy.core.multiarray import ndarray
 
