@@ -7,8 +7,9 @@ from typing import Callable, List, Tuple, Union
 from filelock.filelock import FileLock
 from tactics.ml.agents import A3CAgent
 from tactics.ml.agents.a3c_agent import record
-
+import numpy as np
 import tensorflow as tf
+import jsonpickle
 
 
 def run_learning(path: str, agent: "RecordLearner", log: Callable[[str], None]) -> None:
@@ -65,9 +66,16 @@ class RecordLearner(A3CAgent):
 
         with FileLock(self.MODEL_FILE_LOCK_PATH):
             self.optimizer: tf.keras.optimizers.Optimizer
-            # with open(self.OPTIMIZER_FILE_PATH, "rb") as f:
-            with gzip.open(self.OPTIMIZER_FILE_PATH, "rb") as f:
-                self.optimizer = pickle.load(f)
+            # rebuild optimizer
+            self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+            grad_vars = self.local_model.trainable_weights
+            zero_grads = [tf.zeros_like(w) for w in grad_vars]
+            # Apply gradients which don't do nothing with Adam
+            self.optimizer.apply_gradients(zip(zero_grads, grad_vars))
+            # Get saved weights
+            opt_weights = np.load(self.OPTIMIZER_FILE_PATH, allow_pickle=True)
+            # Set the weights of the optimizer
+            self.optimizer.set_weights(opt_weights)
 
     def learn_from_file(self, path: str):
         self.mem.load(path)
@@ -84,20 +92,21 @@ class RecordLearner(A3CAgent):
 
         with FileLock(self.MODEL_FILE_LOCK_PATH):
             global_records: dict
-            with open(self.GLOBAL_RECORDS_FILE_PATH, "rb") as f:
-                global_records = pickle.load(f)
+            with open(self.GLOBAL_RECORDS_FILE_PATH, "r") as f:
+                text = f.read()
+                global_records = jsonpickle.decode(text)
 
             self.local_model.save_weights(self.MODEL_FILE_PATH)
 
             # Save optimizer weights.
-            with gzip.GzipFile(self.OPTIMIZER_FILE_PATH, "wb") as f:
-                pickle.dump(self.optimizer, f)
+            np.save(self.OPTIMIZER_FILE_PATH, self.optimizer.get_weights())
 
             # Worker.global_episode += 1
             global_records["global_episode"] = self.episode
 
             # Save global records
-            with open(self.GLOBAL_RECORDS_FILE_PATH, "wb") as f:
-                pickle.dump(global_records, f)
+            with open(self.GLOBAL_RECORDS_FILE_PATH, "w") as f:
+                frozen = jsonpickle.encode(global_records)
+                f.write(frozen)
 
         self.print("Global model saved")
