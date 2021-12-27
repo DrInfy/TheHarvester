@@ -152,44 +152,15 @@ class MasterAgent():
         # self.opt = tf.keras.optimizers.Adam(args.lr)
         print(self.state_size, self.action_size)
 
-        # If the model doesn't yet exist, create it
-        with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
-            if not os.path.isfile(MODEL_FILE_PATH):
-                print(f"Model weights not found.\nCreating new weights file at {MODEL_FILE_PATH}")
-                global_model = ActorCriticModel(self.state_size, self.action_size)
-                global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-                # global_model.save_weights(MODEL_FILE_PATH)
-                # global_model.save(MODEL_FILE_PATH)
-                # global_model.compile(optimizer=self.opt)
-                # tf.keras.models.save_model(global_model, MODEL_FILE_PATH)
-                global_model.save(MODEL_FILE_PATH, save_format='tf')
-
-                opt = tf.keras.optimizers.Adam(args.lr)
-                init_optimizer_state(opt, global_model.trainable_variables)
-                save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
-
-        # self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
-        # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-
     def seed(self):
-        # If the model doesn't yet exist, create it
-        with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
-            if not os.path.isfile(MODEL_FILE_PATH):
-                print(f"Model weights not found.\nCreating new weights file at {MODEL_FILE_PATH}")
-                global_model = ActorCriticModel(self.state_size, self.action_size)
-                global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
-                # global_model.save_weights(MODEL_FILE_PATH)
-                # global_model.save(MODEL_FILE_PATH)
-                # global_model.compile(optimizer=self.opt)
-                # tf.keras.models.save_model(global_model, MODEL_FILE_PATH)
-                global_model.save(MODEL_FILE_PATH, save_format='tf')
+        print(f"Seeding new model at {MODEL_FILE_PATH}")
+        global_model = ActorCriticModel(self.state_size, self.action_size)
+        global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+        global_model.save(MODEL_FILE_PATH, save_format='tf')
 
-                opt = tf.keras.optimizers.Adam(args.lr)
-                init_optimizer_state(opt, global_model.trainable_variables)
-                save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
-
-        # self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
-        # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+        opt = tf.keras.optimizers.Adam(args.lr)
+        init_optimizer_state(opt, global_model.trainable_variables)
+        save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
 
     def train(self, num_workers: int = multiprocessing.cpu_count()):
         workers = [Worker(self.state_size,
