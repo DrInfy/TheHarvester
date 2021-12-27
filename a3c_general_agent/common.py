@@ -1,4 +1,5 @@
 import os
+import time
 
 os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
@@ -28,10 +29,11 @@ parser.add_argument('--max-eps', default=1000, type=int,
                     help='Global maximum number of episodes to run.')
 parser.add_argument('--gamma', default=0.99,
                     help='Discount factor of rewards.')
-parser.add_argument('--save-dir', default='./tmp/', type=str,
-                    help='Directory in which you desire to save the model.')
+parser.add_argument('--model-name', default=time.strftime("%Y%m%d-%H%M%S"), type=str,
+                    help='The unique name of the model you want to load or create.')
 parser.add_argument('--workers', default=multiprocessing.cpu_count(), type=int,
                     help='The number of workers to run.')
+parser.add_argument('--seed', action='store_true', help='Whether to seed a new model.')
 args = parser.parse_args()
 
 
