@@ -1,3 +1,4 @@
+
 import threading
 import time
 from typing import List, Union
@@ -11,7 +12,7 @@ from tactics.ml.agents import BaseMLAgent
 # BEGIN SEEDING FIX - THIS HOPEFULLY FIXES AN ISSUE WITH DIFFERENT BEHAVIOUR AFTER MODEL SAVE/LOAD
 seedValue=1
 
-import os
+# import os
 os.environ["PYTHONHASHSEED"]=str(seedValue)
 
 import numpy as np
@@ -28,6 +29,10 @@ session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op
 sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
 tf.compat.v1.keras.backend.set_session(sess)
 # END SEEDING FIX
+
+# stop TF warnings
+import logging
+tf.get_logger().setLevel(logging.ERROR)
 
 # Remove warning spam
 import absl.logging
