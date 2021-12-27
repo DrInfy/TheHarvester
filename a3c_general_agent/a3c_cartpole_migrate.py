@@ -41,18 +41,19 @@ MODEL_FILE_LOCK_PATH = f'{MODEL_FILE_PATH}.lock'
 BEST_MODEL_FILE_NAME = f'{MODEL_NAME}_best.tf'
 BEST_MODEL_FILE_PATH = os.path.join(SAVE_DIR, MODEL_FILE_NAME)
 BEST_MODEL_FILE_LOCK_PATH = f'{BEST_MODEL_FILE_PATH}.lock'
-OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.pkl'
+OPTIMIZER_FILE_NAME = f'{MODEL_NAME}.opt.npy'
 OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
 
 
 class A3CAgent(BaseMLAgent):
     def __init__(self, state_size: int, action_size: int,
                  # global_model: ActorCriticModel,
-                 opt, update_freq: int,
+                 # opt,
+                 update_freq: int,
                  agent_id: int, model_file_path):
         super().__init__(state_size, action_size)
         # self.global_model: ActorCriticModel = global_model
-        self.opt = opt
+        # self.opt = opt
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
         self.update_freq = update_freq
 
@@ -111,14 +112,17 @@ class A3CAgent(BaseMLAgent):
 
             with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
                 global_model = tf.keras.models.load_model(MODEL_FILE_PATH)
+                opt = tf.keras.optimizers.Adam(args.lr)
+                load_optimizer_state(opt, OPTIMIZER_FILE_PATH, global_model.trainable_variables)
                 # global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
                 # Push local gradients to global model
-                self.opt.apply_gradients(zip(grads,
+                opt.apply_gradients(zip(grads,
                                              global_model.trainable_weights))
                 # Update local model with new weights
                 self.local_model.set_weights(global_model.get_weights())
                 # global_model.save_weights(MODEL_FILE_PATH)
                 global_model.save(MODEL_FILE_PATH, save_format='tf')
+                save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
 
             self.mem.clear()
             self.time_count = 0
@@ -140,7 +144,7 @@ class MasterAgent():
         env = gym.make(self.game_name)
         self.state_size = env.observation_space.shape[0]
         self.action_size = env.action_space.n
-        self.opt = tf.keras.optimizers.Adam(args.lr)
+        # self.opt = tf.keras.optimizers.Adam(args.lr)
         print(self.state_size, self.action_size)
 
         # If the model doesn't yet exist, create it
@@ -151,9 +155,13 @@ class MasterAgent():
                 global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
                 # global_model.save_weights(MODEL_FILE_PATH)
                 # global_model.save(MODEL_FILE_PATH)
-                global_model.compile(optimizer=self.opt)
+                # global_model.compile(optimizer=self.opt)
                 # tf.keras.models.save_model(global_model, MODEL_FILE_PATH)
                 global_model.save(MODEL_FILE_PATH, save_format='tf')
+
+                opt = tf.keras.optimizers.Adam(args.lr)
+                init_optimizer_state(opt, global_model.trainable_variables)
+                save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
 
         # self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
         # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
@@ -162,7 +170,7 @@ class MasterAgent():
         workers = [Worker(self.state_size,
                           self.action_size,
                           # self.global_model,
-                          self.opt,
+                          # self.opt,
                           i, game_name=self.game_name,
                           save_dir=self.save_dir) for i in range(args.workers)]
 
@@ -176,10 +184,11 @@ class MasterAgent():
         state = env.reset()
         # model = self.global_model
         with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
-            model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
-        model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(self.game_name))
-        print('Loading model from: {}'.format(model_path))
-        model.load_weights(model_path)
+            model = tf.keras.models.load_model(MODEL_FILE_PATH)
+            # model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
+        # model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(self.game_name))
+        # print('Loading model from: {}'.format(model_path))
+        # model.load_weights(model_path)
         done = False
         step_counter = 0
         reward_sum = 0
@@ -212,14 +221,15 @@ class Worker(threading.Thread):
                  state_size,
                  action_size,
                  # global_model,
-                 opt,
+                 # opt,
                  idx,
                  game_name='CartPole-v0',
                  save_dir='/tmp'):
         super(Worker, self).__init__()
         self.agent = A3CAgent(state_size, action_size,
                               # global_model,
-                              opt, args.update_freq, idx,
+                              # opt,
+                              args.update_freq, idx,
                               os.path.join(save_dir, 'model_{}.h5'.format(game_name)))
         self.env = gym.make(game_name).unwrapped
         self.save_dir = save_dir

@@ -185,3 +185,76 @@ def load_model(state_size: int, action_size: int, model_file_path: str):
     model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
     model.load_weights(model_file_path)
     return model
+
+
+def save_optimizer_state(optimizer, file_path):
+    '''
+    Save keras.optimizers object state.
+
+    Arguments:
+    optimizer --- Optimizer object.
+    save_path --- Path to save location.
+    save_name --- Name of the .npy file to be created.
+
+    '''
+
+    # Create folder if it does not exists
+    # if not os.path.exists(save_path):
+    #     os.makedirs(save_path)
+
+    # save weights
+    np.save(file_path, optimizer.get_weights())
+
+    return
+
+
+def load_optimizer_state(optimizer, file_path, model_train_vars):
+    '''
+    Loads keras.optimizers object state.
+
+    Arguments:
+    optimizer --- Optimizer object to be loaded.
+    load_path --- Path to save location.
+    load_name --- Name of the .npy file to be read.
+    model_train_vars --- List of model variables (obtained using Model.trainable_variables)
+
+    '''
+
+    # Load optimizer weights
+    opt_weights = np.load(file_path, allow_pickle=True)
+
+    # dummy zero gradients
+    zero_grads = [tf.zeros_like(w) for w in model_train_vars]
+    # save current state of variables
+    saved_vars = [tf.identity(w) for w in model_train_vars]
+
+    # Apply gradients which don't do nothing with Adam
+    optimizer.apply_gradients(zip(zero_grads, model_train_vars))
+
+    # Reload variables
+    [x.assign(y) for x, y in zip(model_train_vars, saved_vars)]
+
+    # Set the weights of the optimizer
+    optimizer.set_weights(opt_weights)
+
+    return
+
+
+def init_optimizer_state(optimizer, model_train_vars):
+    '''
+    Initializes keras.optimizers object state.
+    This will initialize the optimizer with dummy weights so that it matches the.
+
+    Arguments:
+    optimizer --- Optimizer object to be initialized.
+    model_train_vars --- List of model variables (obtained using Model.trainable_variables)
+
+    '''
+
+    # dummy zero gradients
+    zero_grads = [tf.zeros_like(w) for w in model_train_vars]
+
+    # Apply gradients which don't do nothing with Adam
+    optimizer.apply_gradients(zip(zero_grads, model_train_vars))
+
+    return
