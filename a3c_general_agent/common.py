@@ -140,7 +140,6 @@ class Memory:
         self.actions = []
         self.rewards = []
 
-
 def compute_loss(local_model,
                  done,
                  new_state,

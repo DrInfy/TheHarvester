@@ -8,6 +8,31 @@ from numpy.core.multiarray import ndarray
 from common import *
 from tactics.ml.agents import BaseMLAgent
 
+# BEGIN SEEDING FIX - THIS HOPEFULLY FIXES AN ISSUE WITH DIFFERENT BEHAVIOUR AFTER MODEL SAVE/LOAD
+seedValue=1
+
+import os
+os.environ["PYTHONHASHSEED"]=str(seedValue)
+
+import numpy as np
+np.random.seed(seedValue)
+
+import random
+random.seed(seedValue)
+
+import tensorflow as tf
+tf.random.set_seed(seedValue)
+tf.compat.v1.set_random_seed(seedValue)
+
+session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
+tf.compat.v1.keras.backend.set_session(sess)
+# END SEEDING FIX
+
+# Remove warning spam
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR)
+
 SAVE_DIR = f'./data/{time.strftime("%Y%m%d-%H%M%S")}'
 MODEL_NAME = 'model'
 MODEL_FILE_NAME = f'{MODEL_NAME}.tf'
@@ -26,10 +51,6 @@ class A3CAgent(BaseMLAgent):
                  opt, update_freq: int,
                  agent_id: int, model_file_path):
         super().__init__(state_size, action_size)
-
-        # with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
-        #     self.local_model = load_model(state_size, action_size, MODEL_FILE_PATH)
-
         # self.global_model: ActorCriticModel = global_model
         self.opt = opt
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
@@ -97,7 +118,7 @@ class A3CAgent(BaseMLAgent):
                 # Update local model with new weights
                 self.local_model.set_weights(global_model.get_weights())
                 # global_model.save_weights(MODEL_FILE_PATH)
-                global_model.save(MODEL_FILE_PATH)
+                global_model.save(MODEL_FILE_PATH, save_format='tf')
 
             self.mem.clear()
             self.time_count = 0
@@ -131,7 +152,8 @@ class MasterAgent():
                 # global_model.save_weights(MODEL_FILE_PATH)
                 # global_model.save(MODEL_FILE_PATH)
                 global_model.compile(optimizer=self.opt)
-                tf.keras.models.save_model(global_model, MODEL_FILE_PATH)
+                # tf.keras.models.save_model(global_model, MODEL_FILE_PATH)
+                global_model.save(MODEL_FILE_PATH, save_format='tf')
 
         # self.global_model = ActorCriticModel(self.state_size, self.action_size)  # global network
         # self.global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
