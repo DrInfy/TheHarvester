@@ -1,6 +1,5 @@
 
 import threading
-import time
 from typing import List, Union
 
 from filelock import FileLock
@@ -111,7 +110,7 @@ class A3CAgent(BaseMLAgent):
             # Calculate local gradients
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
 
-            with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
+            with FileLock(MODEL_FILE_LOCK_PATH, timeout=args.timeout):
                 global_model = tf.keras.models.load_model(MODEL_FILE_PATH)
                 opt = tf.keras.optimizers.Adam(args.lr)
                 load_optimizer_state(opt, OPTIMIZER_FILE_PATH, global_model.trainable_variables)

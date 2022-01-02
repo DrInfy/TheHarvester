@@ -34,6 +34,7 @@ parser.add_argument('--model-name', default=time.strftime("%Y%m%d-%H%M%S"), type
 parser.add_argument('--workers', default=multiprocessing.cpu_count(), type=int,
                     help='The number of workers to run.')
 parser.add_argument('--seed', action='store_true', help='Whether to seed a new model.')
+parser.add_argument('--timeout', default=999999, help='Max amount of time to wait to load the model file.')
 args = parser.parse_args()
 
 
