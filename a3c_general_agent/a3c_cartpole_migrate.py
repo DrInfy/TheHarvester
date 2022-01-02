@@ -30,10 +30,6 @@ sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=sessi
 tf.compat.v1.keras.backend.set_session(sess)
 # END SEEDING FIX
 
-# stop TF warnings
-import logging
-tf.get_logger().setLevel(logging.ERROR)
-
 # Remove warning spam
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
