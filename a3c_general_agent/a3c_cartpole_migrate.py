@@ -1,23 +1,20 @@
+import argparse
+import multiprocessing
 import os
 import time
-
-from numpy.core.multiarray import ndarray
-
 from typing import List, Union
-import gym
-from filelock import FileLock
 
+# Remove warning spam
+import absl.logging
+import gym
 import numpy as np
 import tensorflow as tf
+from filelock import FileLock
+from numpy.core.multiarray import ndarray
 from tensorflow.python import keras
 from tensorflow.python.keras import layers
 
 from tactics.ml.agents import BaseMLAgent
-import multiprocessing
-import argparse
-
-# Remove warning spam
-import absl.logging
 
 absl.logging.set_verbosity(absl.logging.ERROR)
 
@@ -55,6 +52,7 @@ class ModelPaths:
         self.BEST_MODEL_FILE_LOCK_PATH = f'{self.BEST_MODEL_FILE_PATH}.lock'
         self.OPTIMIZER_FILE_NAME = f'{self.MODEL_NAME}.opt.npy'
         self.OPTIMIZER_FILE_PATH = os.path.join(self.SAVE_DIR, self.OPTIMIZER_FILE_NAME)
+
 
 def compute_loss(local_model,
                  done,
@@ -172,7 +170,6 @@ def init_optimizer_state(optimizer, model_train_vars):
     return
 
 
-
 class Memory:
     def __init__(self):
         self.states = []
@@ -188,6 +185,7 @@ class Memory:
         self.states = []
         self.actions = []
         self.rewards = []
+
 
 class ActorCriticModel(keras.Model):
     def __init__(self, state_size, action_size):
@@ -237,6 +235,7 @@ def record(episode,
         f"Worker: {worker_idx}"
     )
     return global_ep_reward
+
 
 class A3CAgent(BaseMLAgent):
     def __init__(self, state_size: int, action_size: int,
@@ -325,9 +324,14 @@ class A3CAgent(BaseMLAgent):
     def on_end(self, state: List[Union[float, int]], reward: float):
         self.post_step(self.selected_action, self.previous_state, True, state, reward)
 
+
+STOP_FILE: str = "worker-stop.txt"
+
+
 def run_worker(worker_index, game_name, model_paths: ModelPaths,
                global_episode, global_moving_average_reward, best_score):
-    # Set up global variables across different processes
+    if os.path.isfile(STOP_FILE):
+        os.remove(STOP_FILE)
 
     env = gym.make(game_name).unwrapped
 
@@ -336,7 +340,8 @@ def run_worker(worker_index, game_name, model_paths: ModelPaths,
     agent = A3CAgent(state_size, action_size,
                      args.update_freq, worker_index, model_paths)
 
-    while global_episode.value < args.max_eps:
+    run_games = True
+    while run_games:
         current_state = env.reset()
         agent.on_start(current_state)
         done = False
@@ -361,7 +366,9 @@ def run_worker(worker_index, game_name, model_paths: ModelPaths,
                 best_score.value = agent.ep_reward
         global_episode.value += 1
 
-
+        if os.path.isfile(STOP_FILE):
+            print(f"Exiting worker... {STOP_FILE} found.")
+            run_games = False
 
 
 class MasterAgent:
@@ -390,8 +397,8 @@ class MasterAgent:
 
     def train(self, num_workers, global_episode, global_moving_average_reward, best_score):
         workers = [multiprocessing.Process(target=run_worker,
-                                    args=(i, self.game_name, self.model_paths,
-                                          global_episode, global_moving_average_reward, best_score))
+                                           args=(i, self.game_name, self.model_paths,
+                                                 global_episode, global_moving_average_reward, best_score))
                    for i in range(num_workers)]
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
