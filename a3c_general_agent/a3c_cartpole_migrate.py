@@ -26,13 +26,9 @@ OPTIMIZER_FILE_PATH = os.path.join(SAVE_DIR, OPTIMIZER_FILE_NAME)
 
 class A3CAgent(BaseMLAgent):
     def __init__(self, state_size: int, action_size: int,
-                 # global_model: ActorCriticModel,
-                 # opt,
                  update_freq: int,
-                 agent_id: int, model_file_path):
+                 agent_id: int):
         super().__init__(state_size, action_size)
-        # self.global_model: ActorCriticModel = global_model
-        # self.opt = opt
         self.local_model = ActorCriticModel(self.state_size, self.action_size)
         self.update_freq = update_freq
 
@@ -43,7 +39,9 @@ class A3CAgent(BaseMLAgent):
         self.ep_loss: float = 0.0
 
         self.agent_id = agent_id
-        self.model_file_path = model_file_path
+
+        self.selected_action = None
+        self.previous_state = None
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()
@@ -91,15 +89,13 @@ class A3CAgent(BaseMLAgent):
 
             with FileLock(MODEL_FILE_LOCK_PATH, timeout=args.timeout):
                 global_model = tf.keras.models.load_model(MODEL_FILE_PATH)
-                opt = tf.keras.optimizers.Adam(args.lr)
-                load_optimizer_state(opt, OPTIMIZER_FILE_PATH, global_model.trainable_variables)
+
+                opt = load_optimizer(OPTIMIZER_FILE_PATH, global_model.trainable_variables)
                 # global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
                 # Push local gradients to global model
-                opt.apply_gradients(zip(grads,
-                                             global_model.trainable_weights))
+                opt.apply_gradients(zip(grads, global_model.trainable_weights))
                 # Update local model with new weights
                 self.local_model.set_weights(global_model.get_weights())
-                # global_model.save_weights(MODEL_FILE_PATH)
                 global_model.save(MODEL_FILE_PATH, save_format='tf')
                 save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
 
@@ -113,40 +109,31 @@ class A3CAgent(BaseMLAgent):
         self.post_step(self.selected_action, self.previous_state, True, state, reward)
 
 
-class MasterAgent():
-    def __init__(self):
-        self.game_name = 'CartPole-v0'
-        self.save_dir = SAVE_DIR
+class MasterAgent:
+    def __init__(self, game_name):
+        self.game_name = game_name
 
-        env = gym.make(self.game_name)
-        self.state_size = env.observation_space.shape[0]
-        self.action_size = env.action_space.n
-        # self.opt = tf.keras.optimizers.Adam(args.lr)
-        print(self.state_size, self.action_size)
-
-        if not os.path.exists(self.save_dir):
+        if not os.path.exists(SAVE_DIR):
             print(f"Model doesn't exist - seeding...")
-            os.makedirs(self.save_dir)
+            os.makedirs(SAVE_DIR)
             self.seed()
 
     def seed(self):
+        env = gym.make(self.game_name)
+        state_size = env.observation_space.shape[0]
+        action_size = env.action_space.n
+
         print(f"Seeding new model at {MODEL_FILE_PATH}")
-        global_model = ActorCriticModel(self.state_size, self.action_size)
-        global_model(tf.convert_to_tensor(np.random.random((1, self.state_size)), dtype=tf.float32))
+        global_model = ActorCriticModel(state_size, action_size)
+        global_model(tf.convert_to_tensor(np.random.random((1, state_size)), dtype=tf.float32))
         global_model.save(MODEL_FILE_PATH, save_format='tf')
 
         opt = tf.keras.optimizers.Adam(args.lr)
         init_optimizer_state(opt, global_model.trainable_variables)
         save_optimizer_state(opt, OPTIMIZER_FILE_PATH)
 
-    def train(self, num_workers: int = multiprocessing.cpu_count()):
-        workers = [Worker(self.state_size,
-                          self.action_size,
-                          # self.global_model,
-                          # self.opt,
-                          i, game_name=self.game_name,
-                          save_dir=self.save_dir) for i in range(args.workers)]
-
+    def train(self, num_workers):
+        workers = [Worker(i, game_name=self.game_name) for i in range(num_workers)]
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
             worker.start()
@@ -155,13 +142,8 @@ class MasterAgent():
     def play(self):
         env = gym.make(self.game_name).unwrapped
         state = env.reset()
-        # model = self.global_model
         with FileLock(MODEL_FILE_LOCK_PATH, timeout=99999):
             model = tf.keras.models.load_model(MODEL_FILE_PATH)
-            # model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
-        # model_path = os.path.join(args.save_dir, 'model_{}.h5'.format(self.game_name))
-        # print('Loading model from: {}'.format(model_path))
-        # model.load_weights(model_path)
         done = False
         step_counter = 0
         reward_sum = 0
@@ -188,24 +170,17 @@ class Worker(threading.Thread):
     # Moving average reward
     global_moving_average_reward = 0
     best_score = 0
-    save_lock = threading.Lock()
 
     def __init__(self,
-                 state_size,
-                 action_size,
-                 # global_model,
-                 # opt,
                  idx,
-                 game_name='CartPole-v0',
-                 save_dir='/tmp'):
+                 game_name='CartPole-v0'):
         super(Worker, self).__init__()
-        self.agent = A3CAgent(state_size, action_size,
-                              # global_model,
-                              # opt,
-                              args.update_freq, idx,
-                              os.path.join(save_dir, 'model_{}.h5'.format(game_name)))
         self.env = gym.make(game_name).unwrapped
-        self.save_dir = save_dir
+
+        state_size = self.env.observation_space.shape[0]
+        action_size = self.env.action_space.n
+        self.agent = A3CAgent(state_size, action_size,
+                              args.update_freq, idx)
 
     def run(self):
         while Worker.global_episode < args.max_eps:
@@ -235,11 +210,8 @@ class Worker(threading.Thread):
 
 
 if __name__ == '__main__':
-    agent = MasterAgent()
-    if args.seed:
-        agent.seed()
-
+    agent = MasterAgent('CartPole-v0')
     if args.train:
-        agent.train()
+        agent.train(args.workers)
     else:
         agent.play()

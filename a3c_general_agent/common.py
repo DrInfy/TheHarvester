@@ -196,14 +196,9 @@ def save_optimizer_state(optimizer, file_path):
 
     Arguments:
     optimizer --- Optimizer object.
-    save_path --- Path to save location.
-    save_name --- Name of the .npy file to be created.
+    file_path --- Path to save location.
 
     '''
-
-    # Create folder if it does not exists
-    # if not os.path.exists(save_path):
-    #     os.makedirs(save_path)
 
     # save weights
     np.save(file_path, optimizer.get_weights())
@@ -211,17 +206,18 @@ def save_optimizer_state(optimizer, file_path):
     return
 
 
-def load_optimizer_state(optimizer, file_path, model_train_vars):
+def load_optimizer(file_path, model_train_vars):
     '''
     Loads keras.optimizers object state.
 
     Arguments:
-    optimizer --- Optimizer object to be loaded.
-    load_path --- Path to save location.
-    load_name --- Name of the .npy file to be read.
+    file_path --- Path to save location.
     model_train_vars --- List of model variables (obtained using Model.trainable_variables)
 
     '''
+
+    # create optimizer
+    opt = tf.keras.optimizers.Adam(args.lr)
 
     # Load optimizer weights
     opt_weights = np.load(file_path, allow_pickle=True)
@@ -232,15 +228,15 @@ def load_optimizer_state(optimizer, file_path, model_train_vars):
     saved_vars = [tf.identity(w) for w in model_train_vars]
 
     # Apply gradients which don't do nothing with Adam
-    optimizer.apply_gradients(zip(zero_grads, model_train_vars))
+    opt.apply_gradients(zip(zero_grads, model_train_vars))
 
     # Reload variables
     [x.assign(y) for x, y in zip(model_train_vars, saved_vars)]
 
     # Set the weights of the optimizer
-    optimizer.set_weights(opt_weights)
+    opt.set_weights(opt_weights)
 
-    return
+    return opt
 
 
 def init_optimizer_state(optimizer, model_train_vars):
