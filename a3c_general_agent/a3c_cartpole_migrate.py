@@ -22,6 +22,8 @@ absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 parser = argparse.ArgumentParser(description='Run A3C algorithm on a game.')
+parser.add_argument('--game', default='CartPole-v0', type=str,
+                    help='The name of the game to play.')
 parser.add_argument('--train', action='store_true',
                     help='Train our model.')
 parser.add_argument('--lr', default=0.001,
@@ -433,7 +435,7 @@ class MasterAgent:
 
 
 if __name__ == '__main__':
-    agent = MasterAgent('CartPole-v0', ModelPaths(args.model_name))
+    agent = MasterAgent(args.game, ModelPaths(args.model_name))
     if args.train:
         manager = multiprocessing.Manager()
         global_episode = manager.Value('i', 0)
