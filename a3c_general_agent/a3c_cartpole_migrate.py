@@ -30,8 +30,10 @@ parser.add_argument('--lr', default=0.001,
                     help='Learning rate for the shared optimizer.')
 parser.add_argument('--update-freq', default=-1, type=int,
                     help='How often to update the global model. Set to -1 to disable.')
-parser.add_argument('--max-eps', default=1000, type=int,
-                    help='Global maximum number of episodes to run.')
+# parser.add_argument('--max-eps', default=1000, type=int,
+#                     help='Global maximum number of episodes to run.')
+parser.add_argument('--max-steps', default=-1, type=int,
+                    help='Maximum number of steps to run in each episode. Set to -1 to disable.')
 parser.add_argument('--gamma', default=0.99,
                     help='Discount factor of rewards.')
 parser.add_argument('--model-name', default=time.strftime("%Y%m%d-%H%M%S"), type=str,
@@ -333,7 +335,7 @@ STOP_FILE: str = "worker-stop.txt"
 
 
 def run_worker(worker_index, game_name, model_paths: ModelPaths,
-               global_episode, global_moving_average_reward, best_score):
+               global_episode, global_moving_average_reward, best_score, max_steps):
     if os.path.isfile(STOP_FILE):
         os.remove(STOP_FILE)
 
@@ -350,7 +352,7 @@ def run_worker(worker_index, game_name, model_paths: ModelPaths,
         agent.on_start(current_state)
         done = False
         reward = 0
-        while not done:
+        while not done and agent.ep_steps < max_steps:
             action = agent.choose_action(current_state, reward)
             current_state, reward, done, _ = env.step(action)
 
@@ -399,10 +401,10 @@ class MasterAgent:
         init_optimizer_state(opt, global_model.trainable_variables)
         save_optimizer_state(opt, self.model_paths.OPTIMIZER_FILE_PATH)
 
-    def train(self, num_workers, global_episode, global_moving_average_reward, best_score):
+    def train(self, num_workers, global_episode, global_moving_average_reward, best_score, max_steps):
         workers = [multiprocessing.Process(target=run_worker,
                                            args=(i, self.game_name, self.model_paths,
-                                                 global_episode, global_moving_average_reward, best_score))
+                                                 global_episode, global_moving_average_reward, best_score, max_steps))
                    for i in range(num_workers)]
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
@@ -441,6 +443,6 @@ if __name__ == '__main__':
         global_episode = manager.Value('i', 0)
         global_moving_average_reward = manager.Value('i', 0)
         best_score = manager.Value('i', 0)
-        agent.train(args.workers, global_episode, global_moving_average_reward, best_score)
+        agent.train(args.workers, global_episode, global_moving_average_reward, best_score, args.max_steps)
     else:
         agent.play()
