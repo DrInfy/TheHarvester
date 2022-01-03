@@ -22,7 +22,7 @@ absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 parser = argparse.ArgumentParser(description='Run A3C algorithm on a game.')
-parser.add_argument('--train', dest='train', action='store_true',
+parser.add_argument('--train', action='store_true',
                     help='Train our model.')
 parser.add_argument('--lr', default=0.001,
                     help='Learning rate for the shared optimizer.')
