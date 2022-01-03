@@ -8,27 +8,6 @@ from numpy.core.multiarray import ndarray
 from common import *
 from tactics.ml.agents import BaseMLAgent
 
-# BEGIN SEEDING FIX - THIS HOPEFULLY FIXES AN ISSUE WITH DIFFERENT BEHAVIOUR AFTER MODEL SAVE/LOAD
-seedValue=1
-
-# import os
-os.environ["PYTHONHASHSEED"]=str(seedValue)
-
-import numpy as np
-np.random.seed(seedValue)
-
-import random
-random.seed(seedValue)
-
-import tensorflow as tf
-tf.random.set_seed(seedValue)
-tf.compat.v1.set_random_seed(seedValue)
-
-session_conf = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-sess = tf.compat.v1.Session(graph=tf.compat.v1.get_default_graph(), config=session_conf)
-tf.compat.v1.keras.backend.set_session(sess)
-# END SEEDING FIX
-
 # Remove warning spam
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
