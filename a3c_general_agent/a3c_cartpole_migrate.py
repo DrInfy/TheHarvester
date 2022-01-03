@@ -138,14 +138,17 @@ class MasterAgent():
     def __init__(self):
         self.game_name = 'CartPole-v0'
         self.save_dir = SAVE_DIR
-        if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
 
         env = gym.make(self.game_name)
         self.state_size = env.observation_space.shape[0]
         self.action_size = env.action_space.n
         # self.opt = tf.keras.optimizers.Adam(args.lr)
         print(self.state_size, self.action_size)
+
+        if not os.path.exists(self.save_dir):
+            print(f"Model doesn't exist - seeding...")
+            os.makedirs(self.save_dir)
+            self.seed()
 
     def seed(self):
         print(f"Seeding new model at {MODEL_FILE_PATH}")
