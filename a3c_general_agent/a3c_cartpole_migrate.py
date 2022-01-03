@@ -308,7 +308,6 @@ class A3CAgent(BaseMLAgent):
                     global_model = tf.keras.models.load_model(self.model_paths.MODEL_FILE_PATH)
 
                     opt = load_optimizer(self.model_paths.OPTIMIZER_FILE_PATH, global_model.trainable_variables)
-                    # global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
                     # Push local gradients to global model
                     opt.apply_gradients(zip(grads, global_model.trainable_weights))
                     # Update local model with new weights
