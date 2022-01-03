@@ -9,7 +9,7 @@ import absl.logging
 import gym
 import numpy as np
 import tensorflow as tf
-from filelock import FileLock
+from filelock import FileLock, Timeout
 from numpy.core.multiarray import ndarray
 from tensorflow.python import keras
 from tensorflow.python.keras import layers
@@ -303,17 +303,20 @@ class A3CAgent(BaseMLAgent):
             # Calculate local gradients
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
 
-            with FileLock(self.model_paths.MODEL_FILE_LOCK_PATH, timeout=args.timeout):
-                global_model = tf.keras.models.load_model(self.model_paths.MODEL_FILE_PATH)
+            try:
+                with FileLock(self.model_paths.MODEL_FILE_LOCK_PATH, timeout=args.timeout):
+                    global_model = tf.keras.models.load_model(self.model_paths.MODEL_FILE_PATH)
 
-                opt = load_optimizer(self.model_paths.OPTIMIZER_FILE_PATH, global_model.trainable_variables)
-                # global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
-                # Push local gradients to global model
-                opt.apply_gradients(zip(grads, global_model.trainable_weights))
-                # Update local model with new weights
-                self.local_model.set_weights(global_model.get_weights())
-                global_model.save(self.model_paths.MODEL_FILE_PATH, save_format='tf')
-                save_optimizer_state(opt, self.model_paths.OPTIMIZER_FILE_PATH)
+                    opt = load_optimizer(self.model_paths.OPTIMIZER_FILE_PATH, global_model.trainable_variables)
+                    # global_model = load_model(self.state_size, self.action_size, MODEL_FILE_PATH)
+                    # Push local gradients to global model
+                    opt.apply_gradients(zip(grads, global_model.trainable_weights))
+                    # Update local model with new weights
+                    self.local_model.set_weights(global_model.get_weights())
+                    global_model.save(self.model_paths.MODEL_FILE_PATH, save_format='tf')
+                    save_optimizer_state(opt, self.model_paths.OPTIMIZER_FILE_PATH)
+            except Timeout:
+                pass  # move onto the next episode
 
             self.mem.clear()
             self.time_count = 0
