@@ -3,6 +3,7 @@ import multiprocessing
 import os
 import time
 from typing import List, Union
+from sys import maxsize
 
 # Remove warning spam
 import absl.logging
@@ -442,7 +443,7 @@ if __name__ == '__main__':
         manager = multiprocessing.Manager()
         global_episode = manager.Value('i', 0)
         global_moving_average_reward = manager.Value('i', 0)
-        best_score = manager.Value('i', 0)
+        best_score = manager.Value('i', -maxsize)  # start with the most negative best score possible
         agent.train(args.workers, global_episode, global_moving_average_reward, best_score, args.max_steps)
     else:
         agent.play()
