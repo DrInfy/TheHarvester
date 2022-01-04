@@ -1,6 +1,7 @@
 from typing import Dict, Callable, Optional, List
 
 from harvester.agent_manager import ZergAgentManager
+from harvester.builds.worker_distraction import WorkerDistraction_v0
 from sc2 import Result
 from sharpy.knowledges import KnowledgeBot
 from sharpy.managers.extensions import BuildDetector, ChatManager
@@ -14,6 +15,7 @@ builds: Dict[str, Callable[[], MlBuild]] = {
     "default": lambda: AllBuild(),
     "econ_lings": lambda: EconLings_v0(),
     "roach": lambda: EconLingRoach(),
+    "workerdistraction": lambda: WorkerDistraction_v0(),
 }
 
 

@@ -1,11 +1,9 @@
 from sc2 import UnitTypeId
-from sc2.ids.upgrade_id import UpgradeId
 from sharpy.knowledges import KnowledgeBot
-from sharpy.managers.roles import UnitTask
-from sharpy.plans import BuildOrder, StepBuildGas, SequentialList, Step
+from sharpy.managers.core.roles import UnitTask
+from sharpy.plans import BuildOrder, SequentialList
 from sharpy.plans.acts import *
-from sharpy.plans.acts.zerg import AutoOverLord, MorphLair, ZergUnit
-from sharpy.plans.require import RequiredGas, RequireCustom, RequiredUnitExists, RequiredAny, RequiredTechReady
+from sharpy.plans.acts.zerg import AutoOverLord
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import InjectLarva
 
@@ -20,7 +18,7 @@ class WorkerRushDefender(KnowledgeBot):
         return BuildOrder([
             SequentialList([
                 ActUnit(UnitTypeId.DRONE, UnitTypeId.LARVA, 14),
-                ActExpand(2),
+                Expand(2),
                 ActBuilding(UnitTypeId.SPAWNINGPOOL, 1),
                 ActUnit(UnitTypeId.OVERLORD, UnitTypeId.LARVA, 2),
                 ActUnit(UnitTypeId.QUEEN, UnitTypeId.HATCHERY, 1),
@@ -28,7 +26,7 @@ class WorkerRushDefender(KnowledgeBot):
             ]),
             SequentialList(
                 [
-                    PlanDistributeWorkers(),
+                    DistributeWorkers(),
                     PlanZoneDefense(),
                     AutoOverLord(),
                     InjectLarva(),
@@ -46,4 +44,3 @@ class WorkerRushDefender(KnowledgeBot):
         else:
             for worker in self.workers:
                 self.knowledge.roles.set_task(UnitTask.Gathering, worker)
-

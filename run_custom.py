@@ -1,11 +1,12 @@
 import os
 import sub_module  # Important, do not remove!
+from a3c_agent.ml_debug_worker_rush_defender import WorkerRushDefender
 
 from harvester.theharvester import HarvesterBot
 from sc2 import Race
 from sc2.player import Bot
 
-from bot_loader import GameStarter, BotDefinitions
+from bot_loader import CommandLineGameStarter, BotDefinitions
 from version import update_version_txt
 
 
@@ -23,6 +24,15 @@ def add_definitions(definitions: BotDefinitions):
         None,
     )
 
+    definitions.add_bot(
+        "debugmlworkerrushdefender",
+        lambda params: Bot(
+            Race.Zerg,
+            WorkerRushDefender(),
+        ),
+        None,
+    )
+
 def main():
     update_version_txt()
     root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -30,7 +40,7 @@ def main():
     ladder_bots_path = os.path.join(root_dir, ladder_bots_path)
     definitions: BotDefinitions = BotDefinitions(ladder_bots_path)
     add_definitions(definitions)
-    starter = GameStarter(definitions)
+    starter = CommandLineGameStarter(definitions)
     starter.play()
 
 

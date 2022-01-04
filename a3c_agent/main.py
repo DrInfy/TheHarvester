@@ -34,7 +34,7 @@ absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 parser = argparse.ArgumentParser(description='Run A3C algorithm on a game.')
-parser.add_argument("-env", help=f"Environment name (workerdistraction, harvester, OpenAIGym:<EnvironmentID>).",
+parser.add_argument("--env", help=f"Environment name (workerdistraction, harvester, OpenAIGym:<EnvironmentID>).",
                     default="OpenAIGym:CartPole-v0")
 parser.add_argument('--train', action='store_true',
                     help='Train our model.')
@@ -369,8 +369,8 @@ class EnvUtils:
                                             max_steps: int,
                                             model_paths: ModelPaths) -> BaseEnv:
         if environment_name == "workerdistraction":
-            env = Sc2Env("test_bot.workerdistraction",
-                         "AbyssalReefLE",
+            env = Sc2Env("harvesterzerg",
+                         "Simple64",
                          "debugmlworkerrushdefender",
                          "learning",
                          "workerdistraction")

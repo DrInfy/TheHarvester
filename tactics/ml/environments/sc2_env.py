@@ -1,4 +1,7 @@
-from run_custom import setup_game
+import os
+
+from bot_loader import BotDefinitions, GameStarter
+from run_custom import add_definitions
 from sc2 import Race
 from sc2.player import Bot
 from harvester.theharvester import HarvesterBot
@@ -18,12 +21,21 @@ class Sc2Env:
         self.bot_name = bot_name
         # TODO: https://github.com/openai/gym/blob/master/gym/core.py
 
+    def make_game_starter(self):
+        """take from run_custom.py script"""
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        ladder_bots_path = os.path.join("Bots")
+        ladder_bots_path = os.path.join(root_dir, ladder_bots_path)
+        definitions: BotDefinitions = BotDefinitions(ladder_bots_path)
+        add_definitions(definitions)
+        return GameStarter(definitions)
+
     def run(self):
         try:
-            bot1 = Bot(Race.Zerg, HarvesterBot(self.agent, self.agent_build))
-            # TODO: make a version of setup_game that calls manually _host_game instead
-            # TODO: currently it runs the whole game, it doesn't just set it up
-            setup_game(False, False, bot1, self.bot_name, self.opponent, self.game_map)
+            game_starter = self.make_game_starter()
+            game_starter.play(map_name=self.game_map,
+                              player1=f"{self.bot_name}.{self.agent}.{self.agent_build}",
+                              player2=self.opponent)
         except KeyboardInterrupt:
             print("Received Keyboard Interrupt. Shutting down.")
         finally:
