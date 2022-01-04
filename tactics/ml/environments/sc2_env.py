@@ -22,7 +22,7 @@ class Sc2Env:
         # TODO: https://github.com/openai/gym/blob/master/gym/core.py
 
     def make_game_starter(self):
-        """take from run_custom.py script"""
+        """taken from run_custom.py script"""
         root_dir = os.path.dirname(os.path.abspath(__file__))
         ladder_bots_path = os.path.join("Bots")
         ladder_bots_path = os.path.join(root_dir, ladder_bots_path)
