@@ -31,7 +31,9 @@ class BaseAgentManager(ManagerBase):
                 s,
                 a,
                 learning_rate=self.learning_rate,
+                update_freq=self.update_freq,
                 gamma=self.gamma,
+                model_file_lock_timeout=self.model_file_lock_timeout,
                 log_print=log,
                 temperature_episodes=0,
             ),
@@ -65,8 +67,10 @@ class BaseAgentManager(ManagerBase):
         self.action = 0
         self.agent_dummy = agent == "scripted" or agent == "scriptonly"
         self.agent_needs_state = agent != "random" and agent != "scriptonly"
-        self.learning_rate = 0.003
-        self.gamma = 0.995
+        self.learning_rate = 0.001
+        self.update_freq = -1  # disabled
+        self.model_file_lock_timeout = 999999  # disabled
+        self.gamma = 0.99
         self.score = 0
         self.build = build
         self.build_name = build_str
