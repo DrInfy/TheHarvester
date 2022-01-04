@@ -1,32 +1,34 @@
-from abc import abstractmethod
 from typing import List, Union, Tuple
 
 from sc2 import UnitTypeId
-from sc2.ids.upgrade_id import UpgradeId
 from sharpy.managers.core.roles import UnitTask
-from sharpy.plans import BuildOrder, StepBuildGas
-from sharpy.plans import Step, SequentialList
+from sharpy.plans import SequentialList
 from sharpy.plans.acts import *
 from sharpy.plans.acts.zerg import *
-from sharpy.plans.require import *
 from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
-from harvester.builds.ml_build import MlBuild
+from tactics.ml.ml_build import MlBuild
 
 num_distraction_workers: int = 3
 
 
 class WorkerDistraction_v0(MlBuild):
+    STATE_SIZE = 2
+    ACTION_SIZE = 2
 
     def __init__(self):
-        super().__init__(2, 2, self.create_plan(), result_multiplier=10000)
+        super().__init__(WorkerDistraction_v0.STATE_SIZE,
+                         WorkerDistraction_v0.ACTION_SIZE,
+                         self.create_plan(),
+                         result_multiplier=10000)
         self.distraction_worker_tags: List[int] = []
         self.is_dead = False
 
     @property
     def state(self) -> List[Union[int, float]]:
         # try:
-        workers = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(self.ai.enemy_start_locations[0])
+        workers = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(
+            self.ai.enemy_start_locations[0])
         self.is_dead = len(workers) == 0
         return [len(self.ai.enemy_units.closer_than(2, workers[0].position)) > 1 if len(workers) > 0 else False,
                 len(workers)]
@@ -49,7 +51,6 @@ class WorkerDistraction_v0(MlBuild):
             self.knowledge.roles.set_task(UnitTask.Scouting, worker)
             self.distraction_worker_tags.append(worker.tag)
 
-
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
         if self.is_dead:
             return "DEAD", (255, 255, 255)
@@ -62,12 +63,12 @@ class WorkerDistraction_v0(MlBuild):
 
     def attack(self) -> bool:
         for worker in self.ai.workers.tags_in(self.distraction_worker_tags):
-            self.do(worker.attack(self.ai.enemy_start_locations[0]))
+            self.roles.set_task(UnitTask.Attacking, worker)
         return True
 
     def retreat(self):
         for worker in self.ai.workers.tags_in(self.distraction_worker_tags):
-            self.do(worker.move(self.ai.start_location))
+            self.roles.set_task(UnitTask.Gathering, worker)
         return True
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:

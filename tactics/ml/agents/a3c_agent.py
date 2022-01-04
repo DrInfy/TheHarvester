@@ -222,7 +222,7 @@ class A3CAgent(BaseMLAgent):
         self.selected_action = None
         self.previous_state = None
 
-        self.model_paths = ModelPaths(f"model_{env_name}")
+        self.model_paths = ModelPaths(env_name)
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()

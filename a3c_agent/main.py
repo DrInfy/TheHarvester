@@ -1,6 +1,7 @@
 import os
 import sys
 
+from harvester.builds.worker_distraction import WorkerDistraction_v0
 from tactics.ml.agents.a3c_agent import ModelPaths, ActorCriticModel, init_optimizer_state, save_optimizer_state, \
     record, A3CAgent
 
@@ -51,8 +52,8 @@ parser.add_argument('--max-steps', default=maxsize, type=int,
                     help='Maximum number of steps to run in each episode.')
 parser.add_argument('--gamma', default=0.99,
                     help='Discount factor of rewards.')
-parser.add_argument('--model-name', default=time.strftime("%Y%m%d-%H%M%S"), type=str,
-                    help='The unique name of the model you want to load or create.')
+# parser.add_argument('--model-name', default=time.strftime("%Y%m%d-%H%M%S"), type=str,
+#                     help='The unique name of the model you want to load or create.')
 parser.add_argument('--workers', default=multiprocessing.cpu_count(), type=int,
                     help='The number of workers to run.')
 parser.add_argument('--timeout', default=999999, help='Max amount of time to wait to load the model file.')
@@ -63,7 +64,7 @@ STOP_FILE: str = "worker-stop.txt"
 
 class EnvUtils:
     state_action_size_map = {
-        'workerdistraction': (0, 0),
+        'workerdistraction': (WorkerDistraction_v0.STATE_SIZE, WorkerDistraction_v0.ACTION_SIZE),
         'harvester': (0, 0),
     }
 
@@ -204,7 +205,7 @@ class MasterAgent:
 
 
 if __name__ == '__main__':
-    agent = MasterAgent(args.env, ModelPaths(args.model_name))
+    agent = MasterAgent(args.env, ModelPaths(args.env))
     if args.train:
         manager = multiprocessing.Manager()
         global_episode = manager.Value('i', 0)
