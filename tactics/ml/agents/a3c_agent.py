@@ -1,4 +1,4 @@
-import logging
+
 import os
 from typing import List, Union, Callable
 
@@ -12,7 +12,7 @@ from tensorflow.python.keras import layers
 from tactics.ml.agents import BaseMLAgent
 from tactics.ml.agents.memory import Memory
 
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class ModelPaths:
@@ -180,7 +180,7 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    print(
+    logger.info(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
@@ -200,6 +200,7 @@ class A3CAgent(BaseMLAgent):
                  update_freq: int,
                  gamma: float,
                  model_file_lock_timeout: int,
+                 shared_global_vars: dict,
                  temperature_episodes=10000,  # todo: use this for what?
                  log_print: Callable[[str], None] = print,  # todo: use this for what?
                  agent_id: int=0):
@@ -223,6 +224,7 @@ class A3CAgent(BaseMLAgent):
         self.previous_state = None
 
         self.model_paths = ModelPaths(env_name)
+        self.shared_global_vars = shared_global_vars
 
     def on_start(self, state: List[Union[float, int]]):
         self.mem.clear()
@@ -280,8 +282,14 @@ class A3CAgent(BaseMLAgent):
                     self.local_model.set_weights(global_model.get_weights())
                     global_model.save(self.model_paths.MODEL_FILE_PATH, save_format='tf', include_optimizer=False)
                     save_optimizer_state(opt, self.model_paths.OPTIMIZER_FILE_PATH)
+
+                    if done:
+                        self.print_episode_report(self.shared_global_vars)
             except Timeout:
-                pass  # move onto the next episode
+                logger.warning("Timeout while attempting to access model file!")
+                # If there's a timeout issue, don't let this report not get printed
+                if done:
+                    self.print_episode_report(self.shared_global_vars)
 
             self.mem.clear()
             self.time_count = 0
@@ -291,3 +299,21 @@ class A3CAgent(BaseMLAgent):
 
     def on_end(self, state: List[Union[float, int]], reward: float):
         self.post_step(self.selected_action, self.previous_state, True, state, reward)
+
+    def print_episode_report(self, shared_global_vars: dict):
+        global_moving_average_reward = shared_global_vars['global_moving_average_reward']
+        global_episode = shared_global_vars['global_episode']
+        best_score = shared_global_vars['best_score']
+
+        global_moving_average_reward.value = \
+            record(global_episode.value, self.ep_reward, self.agent_id,
+                   global_moving_average_reward.value,
+                   self.ep_loss, self.ep_steps)
+        # We must use a lock to save our model and to print to prevent data races.
+
+        if self.ep_reward > best_score.value:
+            logger.info("Saving best model to {}, "
+                  "episode score: {}".format(self.model_paths.BEST_MODEL_FILE_PATH, self.ep_reward))
+            self.local_model.save_weights(self.model_paths.BEST_MODEL_FILE_PATH)
+            best_score.value = self.ep_reward
+        global_episode.value += 1

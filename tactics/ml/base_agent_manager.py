@@ -14,7 +14,7 @@ class BaseAgentManager(ManagerBase):
     build: MlBuild
     chatter: ChatManager
 
-    def __init__(self, agent: str, build_str: str, build: MlBuild) -> None:
+    def __init__(self, agent: str, build_str: str, build: MlBuild, shared_global_vars: dict) -> None:
         super().__init__()
         self.agents: Dict[str, Callable[[str, int, int, Callable], BaseMLAgent]] = {
             "explore": lambda env_name, s, a, log: A3CAgent(
@@ -36,6 +36,7 @@ class BaseAgentManager(ManagerBase):
                 model_file_lock_timeout=self.model_file_lock_timeout,
                 log_print=log,
                 temperature_episodes=0,
+                shared_global_vars=self.shared_global_vars,
             ),
             "datalearning": lambda env_name, s, a, log: RecordLearner(
                 env_name,
@@ -75,6 +76,7 @@ class BaseAgentManager(ManagerBase):
         self.build = build
         self.build_name = build_str
         self.agent_name = agent
+        self.shared_global_vars = shared_global_vars
 
     def choose_action(self, state: Optional["ndarray"]) -> int:
         """

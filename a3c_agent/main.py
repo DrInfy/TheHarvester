@@ -87,19 +87,22 @@ class EnvUtils:
                                             gamma: float,
                                             model_file_lock_timeout: int,
                                             agent_id: int,
-                                            max_steps: int) -> BaseEnv:
+                                            max_steps: int,
+                                            shared_global_vars: dict) -> BaseEnv:
         if environment_name == "workerdistraction":
             env = Sc2Env("harvesterzerg",
                          "Simple64",
                          "debugmlworkerrushdefender",
                          "learning",
-                         "workerdistraction")
+                         "workerdistraction",
+                         shared_global_vars)
         elif environment_name == "harvester":
             env = Sc2Env("test_bot.default",
                          "AbyssalReefLE",
                          "harvester",
                          "learning",
-                         "default")
+                         "default",
+                         shared_global_vars)
 
         elif EnvUtils.is_openaigym_environment(environment_name):
             game_name = EnvUtils.extract_openaigym_game_name(environment_name)
@@ -113,6 +116,7 @@ class EnvUtils:
                                           update_freq,
                                           gamma,
                                           model_file_lock_timeout,
+                                          shared_global_vars,
                                           agent_id=agent_id)
             from tactics.ml.environments.open_ai_gym_env import OpenAIGymEnv
             env = OpenAIGymEnv(agent, game_name, max_steps)
@@ -131,10 +135,15 @@ def run_worker(worker_index,
                max_steps,
                global_episode,
                global_moving_average_reward,
-               best_score,
-               model_paths: ModelPaths):
+               best_score):
     if os.path.isfile(STOP_FILE):
         os.remove(STOP_FILE)
+
+    shared_global_vars = {
+        'global_episode': global_episode,
+        'global_moving_average_reward': global_moving_average_reward,
+        'best_score': best_score,
+    }
 
     env = EnvUtils.setup_environment_name_for_training(environment_name,
                                                        learning_rate,
@@ -142,24 +151,11 @@ def run_worker(worker_index,
                                                        gamma,
                                                        model_file_lock_timeout,
                                                        worker_index,
-                                                       max_steps)
+                                                       max_steps,
+                                                       shared_global_vars)
 
     while not os.path.isfile(STOP_FILE):
         env.run()
-
-        global_moving_average_reward.value = \
-            record(global_episode.value, env.agent.ep_reward, env.agent.agent_id,
-                   global_moving_average_reward.value,
-                   env.agent.ep_loss, env.agent.ep_steps)
-        # We must use a lock to save our model and to print to prevent data races.
-
-        with FileLock(model_paths.BEST_MODEL_FILE_LOCK_PATH, timeout=99999):
-            if env.agent.ep_reward > best_score.value:
-                print("Saving best model to {}, "
-                      "episode score: {}".format(model_paths.BEST_MODEL_FILE_PATH, env.agent.ep_reward))
-                env.agent.local_model.save_weights(model_paths.BEST_MODEL_FILE_PATH)
-                best_score.value = env.agent.ep_reward
-        global_episode.value += 1
 
     print(f"Exiting worker... {STOP_FILE} found.")
 
@@ -205,8 +201,7 @@ class MasterAgent:
                                                  max_steps,
                                                  global_episode,
                                                  global_moving_average_reward,
-                                                 best_score,
-                                                 self.model_paths))
+                                                 best_score))
                    for i in range(num_workers)]
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
