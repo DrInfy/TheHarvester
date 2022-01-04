@@ -44,6 +44,12 @@ class WorkerDistraction_v0(MlBuild):
         self.reward += self.action  # 1 == attacking, 0 == retreating. Means we encourage attacking.
         return self.reward
 
+    async def execute(self) -> bool:
+        if self.is_dead:
+            return True  # give up
+
+        return await super().execute()
+
     async def start(self, knowledge: 'Knowledge'):
         await super().start(knowledge)
         distraction_workers = self.ai.workers.closest_n_units(self.ai.enemy_start_locations[0], num_distraction_workers)
