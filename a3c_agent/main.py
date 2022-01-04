@@ -10,17 +10,12 @@ sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
 import argparse
 import multiprocessing
-import time
-from typing import List, Union
 from sys import maxsize
 
 import gym
 import numpy as np
 import tensorflow as tf
-from filelock import FileLock, Timeout
-from numpy.core.multiarray import ndarray
-from tensorflow.python import keras
-from tensorflow.python.keras import layers
+from filelock import FileLock
 
 from tactics.ml.agents import BaseMLAgent
 from tactics.ml.environments.base_env import BaseEnv
@@ -38,8 +33,8 @@ absl.logging.set_verbosity(absl.logging.ERROR)
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 parser = argparse.ArgumentParser(description='Run A3C algorithm on a game.')
-parser.add_argument("--env", help=f"Environment name (workerdistraction, harvester, OpenAIGym:<EnvironmentID>).",
-                    default="OpenAIGym:CartPole-v0")
+parser.add_argument("--env", help=f"Environment name (workerdistraction, harvester, OpenAIGym.<EnvironmentID>).",
+                    default="OpenAIGym.CartPole-v0")
 parser.add_argument('--train', action='store_true',
                     help='Train our model.')
 parser.add_argument('--lr', default=0.001,
@@ -70,11 +65,11 @@ class EnvUtils:
 
     @staticmethod
     def is_openaigym_environment(environment_name: str) -> bool:
-        return environment_name.startswith("OpenAIGym:")
+        return environment_name.startswith("OpenAIGym.")
 
     @staticmethod
     def extract_openaigym_game_name(environment_name: str) -> str:
-        return environment_name.split(":", 1)[1]
+        return environment_name.split(".", 1)[1]
 
     @staticmethod
     def get_env_state_action_sizes(environment_name: str) -> (int, int):
@@ -87,10 +82,12 @@ class EnvUtils:
 
     @staticmethod
     def setup_environment_name_for_training(environment_name,
+                                            learning_rate: float,
                                             update_freq: int,
+                                            gamma: float,
+                                            model_file_lock_timeout: int,
                                             agent_id: int,
-                                            max_steps: int,
-                                            model_paths: ModelPaths) -> BaseEnv:
+                                            max_steps: int) -> BaseEnv:
         if environment_name == "workerdistraction":
             env = Sc2Env("harvesterzerg",
                          "Simple64",
@@ -109,7 +106,14 @@ class EnvUtils:
 
             state_size, action_size = EnvUtils.get_env_state_action_sizes(environment_name)
 
-            agent: BaseMLAgent = A3CAgent(state_size, action_size, update_freq, agent_id, model_paths)
+            agent: BaseMLAgent = A3CAgent(environment_name,
+                                          state_size,
+                                          action_size,
+                                          learning_rate,
+                                          update_freq,
+                                          gamma,
+                                          model_file_lock_timeout,
+                                          agent_id=agent_id)
             from tactics.ml.environments.open_ai_gym_env import OpenAIGymEnv
             env = OpenAIGymEnv(agent, game_name, max_steps)
         else:
@@ -118,13 +122,27 @@ class EnvUtils:
         return env
 
 
-def run_worker(worker_index, environment_name, model_paths: ModelPaths,
-               global_episode, global_moving_average_reward, best_score, max_steps, update_freq):
+def run_worker(worker_index,
+               environment_name,
+               learning_rate,
+               update_freq,
+               gamma,
+               model_file_lock_timeout,
+               max_steps,
+               global_episode,
+               global_moving_average_reward,
+               best_score,
+               model_paths: ModelPaths):
     if os.path.isfile(STOP_FILE):
         os.remove(STOP_FILE)
 
-    env = EnvUtils.setup_environment_name_for_training(environment_name, update_freq, worker_index, max_steps,
-                                                       model_paths)
+    env = EnvUtils.setup_environment_name_for_training(environment_name,
+                                                       learning_rate,
+                                                       update_freq,
+                                                       gamma,
+                                                       model_file_lock_timeout,
+                                                       worker_index,
+                                                       max_steps)
 
     while not os.path.isfile(STOP_FILE):
         env.run()
@@ -147,9 +165,9 @@ def run_worker(worker_index, environment_name, model_paths: ModelPaths,
 
 
 class MasterAgent:
-    def __init__(self, environment_name, model_paths: ModelPaths):
+    def __init__(self, environment_name):
         self.environment_name = environment_name
-        self.model_paths = model_paths
+        self.model_paths = ModelPaths(self.environment_name)
 
         if not os.path.exists(self.model_paths.SAVE_DIR):
             print(f"Model doesn't exist - seeding...")
@@ -168,11 +186,27 @@ class MasterAgent:
         init_optimizer_state(opt, global_model.trainable_variables)
         save_optimizer_state(opt, self.model_paths.OPTIMIZER_FILE_PATH)
 
-    def train(self, num_workers, global_episode, global_moving_average_reward, best_score, max_steps, update_freq):
+    def train(self, num_workers,
+              learning_rate,
+              update_freq,
+              gamma,
+              model_file_lock_timeout,
+              max_steps,
+              global_episode,
+              global_moving_average_reward,
+              best_score):
         workers = [multiprocessing.Process(target=run_worker,
-                                           args=(i, self.environment_name, self.model_paths,
-                                                 global_episode, global_moving_average_reward, best_score, max_steps,
-                                                 update_freq))
+                                           args=(i,
+                                                 self.environment_name,
+                                                 learning_rate,
+                                                 update_freq,
+                                                 gamma,
+                                                 model_file_lock_timeout,
+                                                 max_steps,
+                                                 global_episode,
+                                                 global_moving_average_reward,
+                                                 best_score,
+                                                 self.model_paths))
                    for i in range(num_workers)]
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
@@ -205,13 +239,21 @@ class MasterAgent:
 
 
 if __name__ == '__main__':
-    agent = MasterAgent(args.env, ModelPaths(args.env))
+    agent = MasterAgent(args.env)
     if args.train:
         manager = multiprocessing.Manager()
         global_episode = manager.Value('i', 0)
         global_moving_average_reward = manager.Value('i', 0)
         best_score = manager.Value('i', -maxsize)  # start with the most negative best score possible
-        agent.train(args.workers, global_episode, global_moving_average_reward, best_score, args.max_steps,
-                    args.update_freq)
+
+        agent.train(args.workers,
+                    args.lr,
+                    args.update_freq,
+                    args.gamma,
+                    args.timeout,
+                    args.max_steps,
+                    global_episode,
+                    global_moving_average_reward,
+                    best_score)
     else:
         agent.play()
