@@ -63,12 +63,12 @@ class WorkerDistraction_v0(MlBuild):
 
     def attack(self) -> bool:
         for worker in self.ai.workers.tags_in(self.distraction_worker_tags):
-            self.roles.set_task(UnitTask.Attacking, worker)
+            worker.attack(self.ai.enemy_start_locations[0])
         return True
 
     def retreat(self):
         for worker in self.ai.workers.tags_in(self.distraction_worker_tags):
-            self.roles.set_task(UnitTask.Gathering, worker)
+            worker.move(self.ai.start_location)
         return True
 
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
