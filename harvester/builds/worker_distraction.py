@@ -41,7 +41,7 @@ class WorkerDistraction_v0(MlBuild):
         not_mining_count = len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).filter(lambda unit: unit.is_attacking))
         self.reward = not_mining_count
         self.reward -= len(self.distraction_worker_tags)
-        self.reward += self.action  # 1 == attacking, 0 == retreating
+        self.reward += self.action  # 1 == attacking, 0 == retreating. Means we encourage attacking.
         return self.reward
 
     async def start(self, knowledge: 'Knowledge'):
