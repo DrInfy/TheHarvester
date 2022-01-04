@@ -38,6 +38,8 @@ class Sc2Env:
                               player2=self.opponent)
         except KeyboardInterrupt:
             print("Received Keyboard Interrupt. Shutting down.")
+        except ConnectionResetError:
+            print("ConnectionResetError received. Ignoring...")
         finally:
             pass
             # self.env.close()
