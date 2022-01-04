@@ -406,18 +406,6 @@ def run_worker(worker_index, environment_name, model_paths: ModelPaths,
     while not os.path.isfile(STOP_FILE):
         env.run()
 
-        # run_games = True
-        # while run_games:
-        #     current_state = env.reset()
-        #     agent.on_start(current_state)
-        #     done = False
-        #     reward = 0
-        #     while not done and agent.ep_steps < max_steps:
-        #         action = agent.choose_action(current_state, reward)
-        #         current_state, reward, done, _ = env.step(action)
-        #
-        #     agent.on_end(current_state, reward)
-
         global_moving_average_reward.value = \
             record(global_episode.value, env.agent.ep_reward, env.agent.agent_id,
                    global_moving_average_reward.value,
@@ -432,9 +420,7 @@ def run_worker(worker_index, environment_name, model_paths: ModelPaths,
                 best_score.value = env.agent.ep_reward
         global_episode.value += 1
 
-        # if os.path.isfile(STOP_FILE):
     print(f"Exiting worker... {STOP_FILE} found.")
-        #     run_games = False
 
 
 class MasterAgent:
