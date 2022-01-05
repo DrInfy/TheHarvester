@@ -180,7 +180,7 @@ def record(episode,
         global_ep_reward = episode_reward
     else:
         global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    logger.info(
+    logger.warning(
         f"Episode: {episode} | "
         f"Moving Average Reward: {int(global_ep_reward)} | "
         f"Episode Reward: {int(episode_reward)} | "
@@ -312,7 +312,7 @@ class A3CAgent(BaseMLAgent):
         # We must use a lock to save our model and to print to prevent data races.
 
         if self.ep_reward > best_score.value:
-            logger.info("Saving best model to {}, "
+            logger.warning("Saving best model to {}, "
                   "episode score: {}".format(self.model_paths.BEST_MODEL_FILE_PATH, self.ep_reward))
             self.local_model.save_weights(self.model_paths.BEST_MODEL_FILE_PATH)
             best_score.value = self.ep_reward
