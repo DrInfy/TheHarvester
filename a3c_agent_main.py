@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import traceback
 
 sys.path.insert(1, "sharpy-sc2")
 sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
@@ -162,6 +163,7 @@ def run_worker(worker_index,
         except Exception as ex:
             print(f"Exception caught in environment run!")
             print(ex)
+            traceback.print_exc()
 
     print(f"Exiting worker... {STOP_FILE} found.")
 
