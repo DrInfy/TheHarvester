@@ -157,7 +157,11 @@ def run_worker(worker_index,
                                                        shared_global_vars)
 
     while not os.path.isfile(STOP_FILE):
-        env.run()
+        try:
+            env.run()
+        except Exception as ex:
+            print(f"Exception caught in environment run!")
+            print(ex)
 
     print(f"Exiting worker... {STOP_FILE} found.")
 
@@ -205,9 +209,12 @@ class MasterAgent:
                                                  global_moving_average_reward,
                                                  best_score))
                    for i in range(num_workers)]
+        WORKER_START_DELAY_SECS = 2
         for i, worker in enumerate(workers):
             print("Starting worker {}".format(i))
             worker.start()
+            print(f"Waiting {WORKER_START_DELAY_SECS} seconds...")
+            time.sleep(2)
         [w.join() for w in workers]
 
     def play(self):
