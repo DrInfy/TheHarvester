@@ -1,12 +1,14 @@
 import os
 import sys
+import time
+
+sys.path.insert(1, "sharpy-sc2")
+sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
 from harvester.builds.worker_distraction import WorkerDistraction_v0
 from tactics.ml.agents.a3c_agent import ModelPaths, ActorCriticModel, init_optimizer_state, save_optimizer_state, \
     record, A3CAgent
 
-sys.path.insert(1, "sharpy-sc2")
-sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
 import argparse
 import multiprocessing

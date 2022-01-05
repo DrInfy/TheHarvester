@@ -1,0 +1,1 @@
+python ./a3c_agent_main.py --train --workers 10 --env workerdistraction --update-freq 20
