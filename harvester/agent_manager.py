@@ -15,8 +15,8 @@ class ZergAgentManager(BaseAgentManager):
     game_analyzer: IGameAnalyzer
     enemy_units_manager: IEnemyUnitsManager
 
-    def __init__(self, agent: str, build_str: str, build: MlBuild, shared_global_vars: dict) -> None:
-        super().__init__(agent, build_str, build, shared_global_vars)
+    def __init__(self, agent: str, build_str: str, build: MlBuild, shared_global_vars: dict, **kwargs) -> None:
+        super().__init__(agent, build_str, build, shared_global_vars, **kwargs)
         self.hatcheryworkers1 = randint(13, 22)
         self.poolworkers = randint(16, 22)
         self.hatcheryworkers2 = randint(30, 50)

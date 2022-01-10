@@ -307,11 +307,11 @@ class A3CAgent(BaseMLAgent):
 
     def print_episode_report(self, shared_global_vars: dict):
         global_moving_average_reward = shared_global_vars['global_moving_average_reward']
-        global_episode = shared_global_vars['global_episode']
+        episode = shared_global_vars['episode']
         best_score = shared_global_vars['best_score']
 
         global_moving_average_reward.value = \
-            record(global_episode.value, self.ep_reward, self.agent_id,
+            record(episode, self.ep_reward, self.agent_id,
                    global_moving_average_reward.value,
                    self.ep_loss, self.ep_steps)
         # We must use a lock to save our model and to print to prevent data races.
@@ -321,4 +321,4 @@ class A3CAgent(BaseMLAgent):
                   "episode score: {}".format(self.model_paths.BEST_MODEL_FILE_PATH, self.ep_reward))
             self.local_model.save_weights(self.model_paths.BEST_MODEL_FILE_PATH)
             best_score.value = self.ep_reward
-        global_episode.value += 1
+        # episode += 1

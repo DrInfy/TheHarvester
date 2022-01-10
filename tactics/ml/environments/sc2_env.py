@@ -13,15 +13,13 @@ class Sc2Env:
     Should look similar to gym env in structure: https://github.com/openai/gym/blob/master/gym/core.py
     """
 
-    def __init__(self, bot_name: str, game_map: str, opponent: str, agent: str, agent_build: str,
-                 shared_global_vars: dict):
-        self.agent = agent
-        self.agent_build = agent_build
-        self.opponent = opponent
+    def __init__(self, bot_name_agent_build: str, opponent_name_agent_build: str, game_map: str, shared_global_vars: dict, **kwargs):
+        self.bot_name_agent_build = bot_name_agent_build
+        self.opponent_name_agent_build = opponent_name_agent_build
         self.game_map = game_map
-        self.bot_name = bot_name
         self.shared_global_vars = shared_global_vars
         self.game_starter = self.make_game_starter(shared_global_vars)
+        self.kwargs = kwargs
         # TODO: https://github.com/openai/gym/blob/master/gym/core.py
 
     def make_game_starter(self, shared_global_vars: dict):
@@ -36,8 +34,8 @@ class Sc2Env:
     def run(self):
         try:
             self.game_starter.play(map_name=self.game_map,
-                              player1=f"{self.bot_name}.{self.agent}.{self.agent_build}",
-                              player2=self.opponent)
+                              player1=self.bot_name_agent_build,
+                              player2=self.opponent_name_agent_build, episode=self.shared_global_vars['episode'], **self.kwargs)
         except KeyboardInterrupt:
             print("Received Keyboard Interrupt. Shutting down.")
         except ConnectionResetError:

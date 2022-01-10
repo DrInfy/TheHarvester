@@ -93,19 +93,25 @@ class EnvUtils:
                                             max_steps: int,
                                             shared_global_vars: dict) -> BaseEnv:
         if environment_name == "workerdistraction":
-            env = Sc2Env("harvesterzerg",
-                         "Simple64",
+            env = Sc2Env("harvesterzerg.learning.workerdistraction",
                          "debugmlworkerrushdefender",
-                         "learning",
-                         "workerdistraction",
-                         shared_global_vars)
-        elif environment_name == "harvester":
-            env = Sc2Env("test_bot.default",
-                         "AbyssalReefLE",
-                         "harvester",
-                         "learning",
-                         "default",
-                         shared_global_vars)
+                         "Simple64",
+                         shared_global_vars,
+                         learning_rate=learning_rate,
+                         update_freq=update_freq,
+                         gamma = gamma,
+                         model_file_lock_timeout = model_file_lock_timeout)
+        # elif environment_name == "harvester":
+        #     env = Sc2Env("test_bot.default",
+        #                  "AbyssalReefLE",
+        #                  "harvester",
+        #                  "learning",
+        #                  "default",
+        #                  shared_global_vars,
+        #                  learning_rate=learning_rate,
+        #                  update_freq=update_freq,
+        #                  gamma = gamma,
+        #                  model_file_lock_timeout = model_file_lock_timeout)
 
         elif EnvUtils.is_openaigym_environment(environment_name):
             game_name = EnvUtils.extract_openaigym_game_name(environment_name)
@@ -146,6 +152,7 @@ def run_worker(worker_index,
         'global_episode': global_episode,
         'global_moving_average_reward': global_moving_average_reward,
         'best_score': best_score,
+        'episode': 0,
     }
 
     env = EnvUtils.setup_environment_name_for_training(environment_name,
@@ -159,6 +166,9 @@ def run_worker(worker_index,
 
     while not os.path.isfile(STOP_FILE):
         try:
+            global_episode.value += 1
+            episode = global_episode.value
+            shared_global_vars['episode'] = episode
             env.run()
         except Exception as ex:
             print(f"Exception caught in environment run!")

@@ -40,7 +40,8 @@ class HarvesterBot(KnowledgeBot):
         self.agent_str = agent
         self.build_str = build
         self.model_index = model_index
-        self.shared_global_vars = None
+        self.shared_global_vars = None  # populated by the game runner
+        self.kwargs = None  # populated by the game runner
 
     def configure_managers(self) -> Optional[List["ManagerBase"]]:
         self.knowledge.log_manager.start_with = "[EDGE] "
@@ -55,7 +56,8 @@ class HarvesterBot(KnowledgeBot):
             model_name = self.build_str + "." + self.model_index
         else:
             model_name = self.build_str
-        agent_manager = ZergAgentManager(self.agent_str, model_name, builds[self.build_str](), self.shared_global_vars)
+        agent_manager = ZergAgentManager(self.agent_str, model_name, builds[self.build_str](), self.shared_global_vars,
+                                         **self.kwargs)
         return agent_manager
 
     async def create_plan(self) -> "BuildOrder":
