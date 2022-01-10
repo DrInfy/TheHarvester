@@ -40,7 +40,7 @@ parser.add_argument("--env", help=f"Environment name (workerdistraction, harvest
                     default="OpenAIGym.CartPole-v0")
 parser.add_argument('--train', action='store_true',
                     help='Train our model.')
-parser.add_argument('--lr', default=0.001,
+parser.add_argument('--lr', default=0.001, type=float,
                     help='Learning rate for the shared optimizer.')
 parser.add_argument('--update-freq', default=-1, type=int,
                     help='How often to update the global model. Set to -1 to disable.')
@@ -48,7 +48,7 @@ parser.add_argument('--update-freq', default=-1, type=int,
 #                     help='Global maximum number of episodes to run.')
 parser.add_argument('--max-steps', default=maxsize, type=int,
                     help='Maximum number of steps to run in each episode.')
-parser.add_argument('--gamma', default=0.99,
+parser.add_argument('--gamma', default=0.99, type=float,
                     help='Discount factor of rewards.')
 # parser.add_argument('--model-name', default=time.strftime("%Y%m%d-%H%M%S"), type=str,
 #                     help='The unique name of the model you want to load or create.')
