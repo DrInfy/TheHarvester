@@ -18,6 +18,12 @@ builds: Dict[str, Callable[[], MlBuild]] = {
     "workerdistraction": lambda: WorkerDistraction_v0(),
 }
 
+# TODO: Save global vars so training can restart
+# TODO: Log episode records
+# TODO: Run in docker
+# TODO: vs the ML bot against itself
+# TODO: scale attacking range between 0-1
+# TODO: scale workers alive between 0-1
 
 class HarvesterBot(KnowledgeBot):
     agent: BaseMLAgent
