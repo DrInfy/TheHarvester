@@ -271,7 +271,12 @@ class A3CAgent(BaseMLAgent):
             grads = tape.gradient(total_loss, self.local_model.trainable_weights)
 
             try:
-                with FileLock(self.model_paths.MODEL_FILE_LOCK_PATH, timeout=self.model_file_lock_timeout):
+                if done:
+                    # always update if we're done.
+                    timeout = 600000  # 10 minutes
+                else:
+                    timeout = self.model_file_lock_timeout
+                with FileLock(self.model_paths.MODEL_FILE_LOCK_PATH, timeout=timeout):
                     global_model = tf.keras.models.load_model(self.model_paths.MODEL_FILE_PATH, compile=False)
 
                     opt = load_optimizer(self.model_paths.OPTIMIZER_FILE_PATH, global_model.trainable_variables,
@@ -286,10 +291,10 @@ class A3CAgent(BaseMLAgent):
                     if done:
                         self.print_episode_report(self.shared_global_vars)
             except Timeout:
-                logger.warning("Timeout while attempting to access model file!")
-                # If there's a timeout issue, don't let this report not get printed
+                # Mid-episode updates are okay to skip in the case of a timeout,
+                # but if we were done, this is a problem because we're potentially losing the experience gained
                 if done:
-                    self.print_episode_report(self.shared_global_vars)
+                    logger.error("Timeout while attempting to access model for final update!")
 
             self.mem.clear()
             self.time_count = 0
