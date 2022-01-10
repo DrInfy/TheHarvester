@@ -14,7 +14,7 @@ from tactics.ml.ml_build import MlBuild
 builds: Dict[str, Callable[[], MlBuild]] = {
     "default": lambda: AllBuild(),
     "econ_lings": lambda: EconLings_v0(),
-    "roach": lambda: EconLingRoach(),
+    "econ_lings_roach": lambda: EconLingRoach(),
     "workerdistraction": lambda: WorkerDistraction_v0(),
 }
 

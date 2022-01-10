@@ -15,14 +15,17 @@ from tactics import *
 
 
 class EconLingRoach(MlBuild):
+    STATE_SIZE = 24
+    ACTION_SIZE = 6
+
     def __init__(self):
-        super().__init__(25, 6, self.create_plan(), result_multiplier=1000)
+        super().__init__(EconLingRoach.STATE_SIZE, EconLingRoach.ACTION_SIZE, self.create_plan(), result_multiplier=1000)
 
     @property
     def state(self) -> List[Union[int, float]]:
         my_lost_m, my_lost_g = self.lost_units_manager.calculate_own_lost_resources()
         enemy_lost_m, enemy_lost_g = self.lost_units_manager.calculate_enemy_lost_resources()
-        enemy_power: ExtendedPower = self.enemy_army_predicter.predicted_enemy_power
+        enemy_power: ExtendedPower = self.ai.game_analyzer.enemy_predicter.predicted_enemy_power
         return [
             self.ai.time,
             self.ai.supply_workers,
@@ -37,9 +40,9 @@ class EconLingRoach(MlBuild):
             self.get_ml_number(UnitTypeId.SPAWNINGPOOL),
             self.get_ml_number(UnitTypeId.ROACHWARREN),
             self.get_ml_number(UnitTypeId.EXTRACTOR),
-            self.ai.enemy_army_predicter.enemy_known_worker_count,
-            self.ai.enemy_army_predicter.enemy_mined_minerals,  # 15
-            self.ai.enemy_army_predicter.enemy_army_known_minerals,
+            self.ai.game_analyzer.enemy_predicter.enemy_known_worker_count,
+            self.ai.game_analyzer.enemy_predicter.enemy_mined_minerals,  # 15
+            self.ai.game_analyzer.enemy_predicter.enemy_army_known_minerals,
             enemy_power.power,
             enemy_power.air_presence,
             enemy_power.melee_power,
@@ -48,7 +51,7 @@ class EconLingRoach(MlBuild):
             my_lost_g,
             enemy_lost_m,
             enemy_lost_g,
-            self.zone_manager.expansion_zones[0].paths[-1].distance,  # 25
+            # self.zone_manager.expansion_zones[0].paths[-1].distance,  # 25
         ]
 
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
@@ -137,7 +140,7 @@ class EconLingRoach(MlBuild):
         tactics = SequentialList(
             [
                 DistributeWorkers(1),
-                PlanGatherOptimizer(),
+                # PlanGatherOptimizer(),
                 OverlordScout(),
                 Step(None, WorkerScout(), skip_until=Time(70)),
                 SpreadCreep(),

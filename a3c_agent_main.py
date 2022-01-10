@@ -3,12 +3,14 @@ import sys
 import time
 import traceback
 
+from harvester.builds import EconLings_v0, EconLingRoach
+
 sys.path.insert(1, "sharpy-sc2")
 sys.path.insert(1, os.path.join("sharpy-sc2", "python-sc2"))
 
 from harvester.builds.worker_distraction import WorkerDistraction_v0
 from tactics.ml.agents.a3c_agent import ModelPaths, ActorCriticModel, init_optimizer_state, save_optimizer_state, \
-    record, A3CAgent
+    A3CAgent
 
 
 import argparse
@@ -63,6 +65,8 @@ STOP_FILE: str = "worker-stop.txt"
 class EnvUtils:
     state_action_size_map = {
         'workerdistraction': (WorkerDistraction_v0.STATE_SIZE, WorkerDistraction_v0.ACTION_SIZE),
+        'econ_lings': (EconLings_v0.STATE_SIZE, EconLings_v0.ACTION_SIZE),
+        'econ_lings_roach': (EconLingRoach.STATE_SIZE, EconLingRoach.ACTION_SIZE),
         'harvester': (0, 0),
     }
 
@@ -96,6 +100,24 @@ class EnvUtils:
             env = Sc2Env("harvesterzerg.learning.workerdistraction",
                          "debugmlworkerrushdefender",
                          "Simple64",
+                         shared_global_vars,
+                         learning_rate=learning_rate,
+                         update_freq=update_freq,
+                         gamma = gamma,
+                         model_file_lock_timeout = model_file_lock_timeout)
+        elif environment_name == "econ_lings":
+            env = Sc2Env("harvesterzerg.learning.econ_lings",
+                         "harvesterzerg.learning.econ_lings",
+                         "Simple64",
+                         shared_global_vars,
+                         learning_rate=learning_rate,
+                         update_freq=update_freq,
+                         gamma = gamma,
+                         model_file_lock_timeout = model_file_lock_timeout)
+        elif environment_name == "econ_lings_roach":
+            env = Sc2Env("harvesterzerg.learning.econ_lings_roach",
+                         "ai.zerg.veryhard",
+                         "Simple128",
                          shared_global_vars,
                          learning_rate=learning_rate,
                          update_freq=update_freq,
