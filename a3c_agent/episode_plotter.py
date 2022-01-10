@@ -13,7 +13,7 @@ parser = argparse.ArgumentParser(description='Run A3C algorithm on a game.')
 parser.add_argument("--model", help=f"Name of model to process.", required=True)
 args = parser.parse_args()
 
-def get_moving_average(model_name: str):
+def get_log_data(model_name: str):
     model_paths = ModelPaths(model_name)
     episode_log_file = open(model_paths.EPISODE_LOG_PATH, 'r')
     lines = episode_log_file.readlines()
@@ -43,7 +43,7 @@ def get_moving_average(model_name: str):
 
 
 def main():
-    episodes, rewards, loss = get_moving_average(args.model)
+    episodes, rewards, loss = get_log_data(args.model)
     save_plot(args.model, episodes, loss, rewards)
 
 
