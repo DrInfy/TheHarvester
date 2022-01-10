@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import time
@@ -176,6 +177,14 @@ def run_worker(worker_index,
         'best_score': best_score,
         'episode': 0,
     }
+
+    model_paths = ModelPaths(environment_name)
+    if os.path.isfile(model_paths.GLOBAL_RECORDS_FILE_PATH):
+        with open(model_paths.GLOBAL_RECORDS_FILE_PATH) as file:
+            data = json.load(file)
+            shared_global_vars['global_episode'].value = data['global_episode']
+            shared_global_vars['global_moving_average_reward'].value = data['global_moving_average_reward']
+            shared_global_vars['best_score'].value = data['best_score']
 
     env = EnvUtils.setup_environment_name_for_training(environment_name,
                                                        learning_rate,

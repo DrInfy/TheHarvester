@@ -1,4 +1,4 @@
-
+import json
 import os
 from typing import List, Union, Callable
 
@@ -28,6 +28,8 @@ class ModelPaths:
         self.OPTIMIZER_FILE_PATH = os.path.join(self.SAVE_DIR, self.OPTIMIZER_FILE_NAME)
         self.EPISODE_LOG = f'eps.log'
         self.EPISODE_LOG_PATH = os.path.join(self.SAVE_DIR, self.EPISODE_LOG)
+        self.GLOBAL_RECORDS_FILE = f'global_records.json'
+        self.GLOBAL_RECORDS_FILE_PATH = os.path.join(self.SAVE_DIR, self.GLOBAL_RECORDS_FILE)
 
 
 def compute_loss(local_model,
@@ -262,6 +264,7 @@ class A3CAgent(BaseMLAgent):
 
                     if done:
                         self.print_episode_report(self.shared_global_vars)
+                        self.save_shared_global_vars()
             except Timeout:
                 # Mid-episode updates are okay to skip in the case of a timeout,
                 # but if we were done, this is a problem because we're potentially losing the experience gained
@@ -273,6 +276,16 @@ class A3CAgent(BaseMLAgent):
         self.ep_steps += 1
 
         self.time_count += 1
+
+    def save_shared_global_vars(self):
+        json_dict = {
+            'global_episode': self.shared_global_vars['global_episode'].value,
+            'global_moving_average_reward': self.shared_global_vars['global_moving_average_reward'].value,
+            'best_score': self.shared_global_vars['best_score'].value,
+        }
+
+        with open(self.model_paths.GLOBAL_RECORDS_FILE_PATH, 'w') as outfile:
+            json.dump(json_dict, outfile)
 
     def on_end(self, state: List[Union[float, int]], reward: float):
         self.post_step(self.selected_action, self.previous_state, True, state, reward)
