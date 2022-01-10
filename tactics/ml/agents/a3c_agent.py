@@ -5,14 +5,13 @@ from typing import List, Union, Callable
 import numpy as np
 import tensorflow as tf
 from filelock import FileLock, Timeout
+from loguru import logger
 from numpy.core.multiarray import ndarray
 from tensorflow.python import keras
 from tensorflow.python.keras import layers
 
 from tactics.ml.agents import BaseMLAgent
 from tactics.ml.agents.memory import Memory
-
-from loguru import logger
 
 
 class ModelPaths:
@@ -27,6 +26,8 @@ class ModelPaths:
         self.BEST_MODEL_FILE_LOCK_PATH = f'{self.BEST_MODEL_FILE_PATH}.lock'
         self.OPTIMIZER_FILE_NAME = f'{self.MODEL_NAME}.opt.npy'
         self.OPTIMIZER_FILE_PATH = os.path.join(self.SAVE_DIR, self.OPTIMIZER_FILE_NAME)
+        self.EPISODE_LOG = f'eps.log'
+        self.EPISODE_LOG_PATH = os.path.join(self.SAVE_DIR, self.EPISODE_LOG)
 
 
 def compute_loss(local_model,
@@ -160,35 +161,6 @@ class ActorCriticModel(keras.Model):
         return logits, values
 
 
-def record(episode,
-           episode_reward,
-           worker_idx,
-           global_ep_reward,
-           total_loss,
-           num_steps):
-    """Helper function to store score and print statistics.
-
-    Arguments:
-      episode: Current episode
-      episode_reward: Reward accumulated over the current episode
-      worker_idx: Which thread (worker)
-      global_ep_reward: The moving average of the global reward
-      total_loss: The total loss accumualted over the current episode
-      num_steps: The number of steps the episode took to complete
-    """
-    if global_ep_reward == 0:
-        global_ep_reward = episode_reward
-    else:
-        global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
-    logger.warning(
-        f"Episode: {episode} | "
-        f"Moving Average Reward: {int(global_ep_reward)} | "
-        f"Episode Reward: {int(episode_reward)} | "
-        f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
-        f"Steps: {num_steps} | "
-        f"Worker: {worker_idx}"
-    )
-    return global_ep_reward
 
 
 class A3CAgent(BaseMLAgent):
@@ -311,14 +283,49 @@ class A3CAgent(BaseMLAgent):
         best_score = shared_global_vars['best_score']
 
         global_moving_average_reward.value = \
-            record(episode, self.ep_reward, self.agent_id,
+            self.record(episode, self.ep_reward, self.agent_id,
                    global_moving_average_reward.value,
                    self.ep_loss, self.ep_steps)
         # We must use a lock to save our model and to print to prevent data races.
 
         if self.ep_reward > best_score.value:
-            logger.warning("Saving best model to {}, "
+            logger.info("Saving best model to {}, "
                   "episode score: {}".format(self.model_paths.BEST_MODEL_FILE_PATH, self.ep_reward))
             self.local_model.save_weights(self.model_paths.BEST_MODEL_FILE_PATH)
             best_score.value = self.ep_reward
         # episode += 1
+
+    def record(self,
+               episode,
+               episode_reward,
+               worker_idx,
+               global_ep_reward,
+               total_loss,
+               num_steps):
+        """Helper function to store score and print statistics.
+
+        Arguments:
+          episode: Current episode
+          episode_reward: Reward accumulated over the current episode
+          worker_idx: Which thread (worker)
+          global_ep_reward: The moving average of the global reward
+          total_loss: The total loss accumualted over the current episode
+          num_steps: The number of steps the episode took to complete
+        """
+        if global_ep_reward == 0:
+            global_ep_reward = episode_reward
+        else:
+            global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
+
+        log_str = (f"Episode: {episode} | "
+                   f"Moving Average Reward: {int(global_ep_reward)} | "
+                   f"Episode Reward: {int(episode_reward)} | "
+                   f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
+                   f"Steps: {num_steps} | "
+                   f"Worker: {worker_idx}\n")
+        logger.info(log_str)
+
+        with open(self.model_paths.EPISODE_LOG_PATH, 'a') as episode_log_file:
+            episode_log_file.writelines(log_str)
+
+        return global_ep_reward

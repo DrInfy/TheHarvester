@@ -19,7 +19,6 @@ builds: Dict[str, Callable[[], MlBuild]] = {
 }
 
 # TODO: Save global vars so training can restart
-# TODO: Log episode records
 # TODO: Run in docker
 # TODO: vs the ML bot against itself
 # TODO: scale attacking range between 0-1
