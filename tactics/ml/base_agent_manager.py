@@ -14,8 +14,15 @@ class BaseAgentManager(ManagerBase):
     build: MlBuild
     chatter: ChatManager
 
-    def __init__(self, agent: str, build_str: str, build: MlBuild, shared_global_vars: dict) -> None:
+    def __init__(self, agent: str, build_str: str, build: MlBuild, shared_global_vars: dict,
+                 learning_rate=0.001, update_freq=-1, model_file_lock_timeout=999999, gamma=0.99) -> None:
         super().__init__()
+
+        self.learning_rate = learning_rate
+        self.update_freq = update_freq
+        self.model_file_lock_timeout = model_file_lock_timeout
+        self.gamma = gamma
+
         self.agents: Dict[str, Callable[[str, int, int, Callable], BaseMLAgent]] = {
             "explore": lambda env_name, s, a, log: A3CAgent(
                 env_name, s, a, learning_rate=self.learning_rate, gamma=self.gamma, log_print=log
@@ -68,10 +75,6 @@ class BaseAgentManager(ManagerBase):
         self.action = 0
         self.agent_dummy = agent == "scripted" or agent == "scriptonly"
         self.agent_needs_state = agent != "random" and agent != "scriptonly"
-        self.learning_rate = 0.001
-        self.update_freq = -1  # disabled
-        self.model_file_lock_timeout = 999999  # disabled
-        self.gamma = 0.99
         self.score = 0
         self.build = build
         self.build_name = build_str
