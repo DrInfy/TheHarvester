@@ -30,6 +30,8 @@ class ModelPaths:
         self.EPISODE_LOG_PATH = os.path.join(self.SAVE_DIR, self.EPISODE_LOG)
         self.GLOBAL_RECORDS_FILE = f'global_records.json'
         self.GLOBAL_RECORDS_FILE_PATH = os.path.join(self.SAVE_DIR, self.GLOBAL_RECORDS_FILE)
+        self.PLOT_FILE = f'plot.png'
+        self.PLOT_FILE_PATH = os.path.join(self.SAVE_DIR, self.PLOT_FILE)
 
 
 def compute_loss(local_model,
