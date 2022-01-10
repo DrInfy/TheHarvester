@@ -9,39 +9,49 @@ from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
 from tactics.ml.ml_build import MlBuild
 
-num_distraction_workers: int = 3
-
+num_distraction_workers: int = 6
 
 class WorkerDistraction_v0(MlBuild):
-    STATE_SIZE = 2
+    STATE_SIZE = 1
     ACTION_SIZE = 2
 
     def __init__(self):
         super().__init__(WorkerDistraction_v0.STATE_SIZE,
                          WorkerDistraction_v0.ACTION_SIZE,
                          self.create_plan(),
-                         result_multiplier=10000)
+                         result_multiplier=1.0)
         self.distraction_worker_tags: List[int] = []
         self.is_dead = False
 
     @property
     def state(self) -> List[Union[int, float]]:
-        # try:
+        # workers alive
         workers = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(
             self.ai.enemy_start_locations[0])
-        self.is_dead = len(workers) == 0
-        return [len(self.ai.enemy_units.closer_than(2, workers[0].position)) > 1 if len(workers) > 0 else False,
-                len(workers)]
-        # except KeyError:
-        #     return [False, 0]
+        if len(workers) > 0:
+            return [1] if len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).closer_than(5, workers[0].position)) > 0 \
+                       else [0]
+        else:
+            self.is_dead = True
+            return [0]  # They can't be distracted because our workers dead
 
     @property
     def score(self) -> float:
+        self.reward = 0
+
+        workers = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(
+            self.ai.enemy_start_locations[0])
+
         # enemy workers not mining
-        not_mining_count = len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).filter(lambda unit: unit.is_attacking))
-        self.reward = not_mining_count
-        self.reward -= len(self.distraction_worker_tags)
-        self.reward += self.action  # 1 == attacking, 0 == retreating. Means we encourage attacking.
+        if len(workers) > 0:
+            enemy_drones = self.ai.enemy_units.of_type(UnitTypeId.DRONE).closer_than(10, workers[0].position)
+            # not_mining_count = len(enemy_drones)
+            # self.reward += not_mining_count
+            self.reward = 1 if len(enemy_drones) > 0 else 0
+
+        # Encourage attacking when we have workers
+        # if len(self.ai.workers.tags_in(self.distraction_worker_tags)) > 0:
+        #     self.reward += self.action  # 1 == attacking, 0 == retreating.
         return self.reward
 
     async def execute(self) -> bool:
