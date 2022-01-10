@@ -162,7 +162,10 @@ class BaseAgentManager(ManagerBase):
         if self.debug:
             action_name, color = self.build.get_action_name_color(self.action)
             self.ai.client.debug_text_screen(action_name, (0.01, 0.01), color, 16)
-            self.ai.client.debug_text_screen(str(self.score), (0.00, 0.05), color, 16)
+            self.ai.client.debug_text_screen(f"STATE: {str(self.build.state)}", (0.00, 0.05), size=16)
+            self.ai.client.debug_text_screen(f"SCORE: {str(self.score)}", (0.00, 0.09), size=16)
+            self.ai.client.debug_text_screen(f"UPDATE FREQ: {str(self.build.agent.update_freq)}", (0.00, 0.14), size=16)
+            self.ai.client.debug_text_screen(f"LEARNING RATE: {str(self.build.agent.learning_rate)}", (0.00, 0.19), size=16)
 
     async def on_end(self, game_result: Result):
         self.build.on_end(game_result)
