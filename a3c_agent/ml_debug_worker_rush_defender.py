@@ -1,4 +1,5 @@
 from sc2 import UnitTypeId
+from sc2.position import Point2
 from sharpy.knowledges import KnowledgeBot
 from sharpy.managers.core.roles import UnitTask
 from sharpy.plans import BuildOrder, SequentialList
@@ -13,13 +14,23 @@ class WorkerRushDefender(KnowledgeBot):
 
     def __init__(self):
         super().__init__(type(self).__name__)
+        self.SPAWNING_POOL_OFFSET = 6
 
     async def create_plan(self) -> BuildOrder:
+        """Build the spawning pool in a place where the distracting workers won't accidentally attack it.
+        Otherwise it interferes with training"""
+        if self.start_location.y - self.enemy_start_locations[0].y < 0:
+            # top left spawn - build below start location
+            spawning_pool_pos = Point2((self.start_location.x, self.start_location.y+self.SPAWNING_POOL_OFFSET))
+        else:
+            # bottom right spawn - build above start location
+            spawning_pool_pos = Point2((self.start_location.x, self.start_location.y-self.SPAWNING_POOL_OFFSET))
+
         return BuildOrder([
             SequentialList([
                 ActUnit(UnitTypeId.DRONE, UnitTypeId.LARVA, 14),
                 Expand(2),
-                ActBuilding(UnitTypeId.SPAWNINGPOOL, 1),
+                BuildPosition(UnitTypeId.SPAWNINGPOOL, spawning_pool_pos),
                 ActUnit(UnitTypeId.OVERLORD, UnitTypeId.LARVA, 2),
                 ActUnit(UnitTypeId.QUEEN, UnitTypeId.HATCHERY, 1),
                 ActUnit(UnitTypeId.ZERGLING, UnitTypeId.LARVA, 200),
