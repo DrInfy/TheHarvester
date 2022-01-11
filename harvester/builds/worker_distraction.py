@@ -9,7 +9,9 @@ from sharpy.plans.tactics import *
 from sharpy.plans.tactics.zerg import *
 from tactics.ml.ml_build import MlBuild
 
-num_distraction_workers: int = 6
+num_distraction_workers: int = 1
+num_useless_workers: int = 5  # to avoid winning by chance we make some workers useless
+
 
 class WorkerDistraction_v0(MlBuild):
     STATE_SIZE = 1
@@ -21,6 +23,7 @@ class WorkerDistraction_v0(MlBuild):
                          self.create_plan(),
                          result_multiplier=1.0)
         self.distraction_worker_tags: List[int] = []
+        self.useless_worker_tags: List[int] = []
         self.is_dead = False
 
     @property
@@ -67,6 +70,12 @@ class WorkerDistraction_v0(MlBuild):
             self.knowledge.roles.set_task(UnitTask.Scouting, worker)
             self.distraction_worker_tags.append(worker.tag)
 
+        useless_workers = self.ai.workers.tags_not_in(self.distraction_worker_tags) \
+            .closest_n_units(self.ai.enemy_start_locations[0], num_useless_workers)
+        for worker in useless_workers:
+            self.knowledge.roles.set_task(UnitTask.Reserved, worker)
+            self.useless_worker_tags.append(worker.tag)
+
     def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
         if self.is_dead:
             return "ACT: DEAD", (255, 255, 255)
@@ -87,6 +96,12 @@ class WorkerDistraction_v0(MlBuild):
             worker.move(self.ai.start_location)
         return True
 
+    def make_workers_useless(self):
+        """Try and avoid use winning by accident by making some workers useless"""
+        for worker in self.ai.workers.tags_in(self.useless_worker_tags):
+            worker.move(self.ai.start_location)
+        return True
+
     def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
         return [
             SequentialList([
@@ -99,6 +114,7 @@ class WorkerDistraction_v0(MlBuild):
             ]),
             SequentialList(
                 [
+                    ActCustom(self.make_workers_useless),
                     ActCustom(lambda: self.attack() if self.action == 1 else self.retreat()),
                     DistributeWorkers(),
                     PlanZoneDefense(),
