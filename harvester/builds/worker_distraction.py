@@ -1,6 +1,7 @@
 from typing import List, Union, Tuple
 
 from sc2 import UnitTypeId
+from sharpy.general.path import Path
 from sharpy.managers.core.roles import UnitTask
 from sharpy.plans import SequentialList
 from sharpy.plans.acts import *
@@ -14,7 +15,7 @@ num_useless_workers: int = 5  # to avoid winning by chance we make some workers 
 
 
 class WorkerDistraction_v0(MlBuild):
-    STATE_SIZE = 1
+    STATE_SIZE = 3
     ACTION_SIZE = 2
 
     def __init__(self):
@@ -28,15 +29,29 @@ class WorkerDistraction_v0(MlBuild):
 
     @property
     def state(self) -> List[Union[int, float]]:
+        path_distance_between_bases = Path(
+            self.knowledge.pathing_manager.path_finder_terrain.find_path(
+                self.ai.enemy_start_locations[0], self.ai.start_location)).distance
+
+        # state flags
+        self.is_dead = True
+        enemy_workers_distracted: int = 0
+        distance_ratio_to_enemy_main: float = 0.0
+
         # workers alive
         workers = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(
             self.ai.enemy_start_locations[0])
         if len(workers) > 0:
-            return [1] if len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).closer_than(5, workers[0].position)) > 0 \
-                       else [0]
-        else:
-            self.is_dead = True
-            return [0]  # They can't be distracted because our workers dead
+            self.is_dead = False
+
+            if len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).closer_than(5, workers[0].position)) > 0:
+                enemy_workers_distracted = 1
+
+            path_distance_to_enemy_main = Path(self.knowledge.pathing_manager.path_finder_terrain.find_path(
+                self.ai.enemy_start_locations[0], workers[0].position)).distance
+            distance_ratio_to_enemy_main = path_distance_to_enemy_main / path_distance_between_bases
+
+        return [self.is_dead, enemy_workers_distracted, distance_ratio_to_enemy_main]
 
     @property
     def score(self) -> float:
