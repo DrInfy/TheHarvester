@@ -15,6 +15,11 @@ num_useless_workers: int = 5  # to avoid winning by chance we make some workers 
 
 
 class WorkerDistraction_v0(MlBuild):
+    """Intended to be played against the WorkerRushDefender dummy bot.
+    This build negatively handicaps the learning bot's economy and then uses agent decisions to run a scout worker toward the enemy.
+    WorkerRushDefender is coded to be distracted from mining when the scout worker is near it's base.
+    The learning bot should only be able to win via this distraction method."""
+
     STATE_SIZE = 3
     ACTION_SIZE = 2
 
