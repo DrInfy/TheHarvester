@@ -29,7 +29,7 @@ class WorkerRushDefender(KnowledgeBot):
         return BuildOrder([
             SequentialList([
                 ActUnit(UnitTypeId.DRONE, UnitTypeId.LARVA, 14),
-                Expand(2),
+                # Expand(2),
                 BuildPosition(UnitTypeId.SPAWNINGPOOL, spawning_pool_pos),
                 ActUnit(UnitTypeId.OVERLORD, UnitTypeId.LARVA, 2),
                 ActUnit(UnitTypeId.QUEEN, UnitTypeId.HATCHERY, 1),

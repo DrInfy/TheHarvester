@@ -120,7 +120,7 @@ class WorkerDistraction_v0(MlBuild):
         return [
             SequentialList([
                 ActUnit(UnitTypeId.DRONE, UnitTypeId.LARVA, 14),
-                Expand(2),
+                # Expand(2),
                 ActBuilding(UnitTypeId.SPAWNINGPOOL, 1),
                 ActUnit(UnitTypeId.OVERLORD, UnitTypeId.LARVA, 2),
                 ActUnit(UnitTypeId.QUEEN, UnitTypeId.HATCHERY, 1),
