@@ -46,6 +46,15 @@ def main():
     episodes, rewards, loss = get_log_data(args.model)
     save_plot(args.model, episodes, loss, rewards)
 
+def moving_average(rewards):
+    global_ep_reward = []
+    for reward in rewards:
+        if len(global_ep_reward) == 0:
+            global_ep_reward.append(reward)
+        else:
+            global_ep_reward.append(global_ep_reward[-1] * 0.99 + reward * 0.01)
+    return global_ep_reward
+
 
 def save_plot(model_name, episodes, loss, rewards):
     SCATTER_SIZE = 1
@@ -64,22 +73,24 @@ def save_plot(model_name, episodes, loss, rewards):
     rewards_mean_200 = pd.Series(rewards).rolling(window=50).mean()
     p3 = ax1.plot(episodes, rewards_mean_200, color='yellow', label="Episode Rewards Mean 200", linestyle="--",
                   linewidth=LINE_WIDTH)[0]
+    ma = moving_average(rewards)
+    p4 = ax1.plot(episodes, ma, color='blue', label="Episode Moving Average", linewidth=LINE_WIDTH)[0]
 
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     ax2.set_ylabel('Loss')  # we already handled the x-label with ax1
-    p4 = ax2.scatter(episodes, loss, label="Episode Loss", s=SCATTER_SIZE)
+    p5 = ax2.scatter(episodes, loss, label="Episode Loss", s=SCATTER_SIZE)
     loss_mean_50 = pd.Series(loss).rolling(window=10).mean()
-    p5 = ax2.plot(episodes, loss_mean_50, color='green', label="Episode Loss Mean 50", linestyle="-",
+    p6 = ax2.plot(episodes, loss_mean_50, color='green', label="Episode Loss Mean 50", linestyle="-",
                   linewidth=LINE_WIDTH)[0]
     loss_mean_200 = pd.Series(loss).rolling(window=50).mean()
-    p6 = ax2.plot(episodes, loss_mean_200, color='purple', label="Episode Loss Mean 200", linestyle="--",
+    p7 = ax2.plot(episodes, loss_mean_200, color='purple', label="Episode Loss Mean 200", linestyle="--",
                   linewidth=LINE_WIDTH)[0]
     # ax2.legend(loc='center left')
     # ax2.tick_params(axis='y')
-    plt.legend([p1, p2, p3, p4, p5, p6],
-               ["Episode Rewards", "Episode Rewards Mean 50", "Episode Rewards Mean 200",
+    plt.legend([p1, p2, p3, p4, p5, p6, p7],
+               ["Episode Rewards", "Episode Rewards Mean 50", "Episode Rewards Mean 200", "Episode Moving Average",
                 "Episode Loss", "Episode Loss Mean 50", "Episode Loss Mean 200", ])
-    plt.savefig(model_paths.PLOT_FILE_PATH)
+    plt.savefig(model_paths.PLOT_FILE_PATH, dpi=300)
     plt.show()
 
 
