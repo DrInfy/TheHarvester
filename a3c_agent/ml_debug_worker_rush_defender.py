@@ -52,8 +52,9 @@ class WorkerRushDefender(KnowledgeBot):
         enemy = self.enemy_units.closer_than(10, self.start_location)
         if enemy:
             for worker in self.workers:
-                self.knowledge.roles.set_task(UnitTask.Attacking, worker)
                 worker.attack(enemy[0])
         else:
             for worker in self.workers:
+                if worker.is_attacking:  # this avoids them getting stuck attacking.
+                    worker.stop()
                 self.knowledge.roles.set_task(UnitTask.Gathering, worker)
