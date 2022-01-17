@@ -1,3 +1,4 @@
+from datetime import datetime
 import json
 import os
 from typing import List, Union, Callable
@@ -332,7 +333,8 @@ class A3CAgent(BaseMLAgent):
         else:
             global_ep_reward = global_ep_reward * 0.99 + episode_reward * 0.01
 
-        log_str = (f"Episode: {episode} | "
+        log_str = (f"Time: {datetime.now()} | "
+                   f"Episode: {episode} | "
                    f"Moving Average Reward: {int(global_ep_reward)} | "
                    f"Episode Reward: {int(episode_reward)} | "
                    f"Loss: {int(total_loss / float(num_steps) * 1000) / 1000} | "
