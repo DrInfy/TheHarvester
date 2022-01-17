@@ -7,8 +7,8 @@ import tensorflow as tf
 from filelock import FileLock, Timeout
 from loguru import logger
 from numpy.core.multiarray import ndarray
-from tensorflow.python import keras
-from tensorflow.python.keras import layers
+from tensorflow import keras
+from tensorflow.keras import layers
 
 from tactics.ml.agents import BaseMLAgent
 from tactics.ml.agents.memory import Memory
