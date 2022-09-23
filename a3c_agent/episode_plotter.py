@@ -67,13 +67,13 @@ def save_plot(model_name, episodes, loss, rewards):
     ax1.set_xlabel('Episode')
 
     ax1.set_ylabel('Reward')
-    p1 = ax1.scatter(episodes, rewards, color='red', label="Episode Reward", s=SCATTER_SIZE)
+    p1 = ax1.scatter(episodes, rewards, color='orange', label="Episode Reward", s=SCATTER_SIZE)
     rewards_ma = moving_average(rewards)
     p2 = ax1.plot(episodes, rewards_ma, color='red', label="Reward Moving Average", linewidth=LINE_WIDTH)[0]
 
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
     ax2.set_ylabel('Loss')  # we already handled the x-label with ax1
-    p3 = ax2.scatter(episodes, loss, color='blue', label="Episode Loss", s=SCATTER_SIZE)
+    p3 = ax2.scatter(episodes, loss, color='green', label="Episode Loss", s=SCATTER_SIZE)
     loss_ma = moving_average(loss)
     p4 = ax2.plot(episodes, loss_ma, color='blue', label="Loss Moving Average", linewidth=LINE_WIDTH)[0]
     plt.legend([p1, p2, p3, p4],

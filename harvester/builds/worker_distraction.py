@@ -1,6 +1,7 @@
 from typing import List, Union, Tuple
 
 from sc2 import UnitTypeId
+from sc2.position import Point2
 from sharpy.general.path import Path
 from sharpy.managers.core.roles import UnitTask
 from sharpy.plans import SequentialList
@@ -42,7 +43,7 @@ class WorkerDistraction_v0(MlBuild):
         self.is_dead = True
         enemy_workers_distracted: int = 0
         distance_ratio_to_enemy_main: float = 0.0
-
+        time: float = self.ai.state.game_loop / 10000.0
         # workers alive
         workers = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(
             self.ai.enemy_start_locations[0])
@@ -56,7 +57,7 @@ class WorkerDistraction_v0(MlBuild):
                 self.ai.enemy_start_locations[0], workers[0].position)).distance
             distance_ratio_to_enemy_main = path_distance_to_enemy_main / path_distance_between_bases
 
-        return [self.is_dead, enemy_workers_distracted, distance_ratio_to_enemy_main]
+        return [self.is_dead, enemy_workers_distracted, distance_ratio_to_enemy_main]#, time]
 
     @property
     def score(self) -> float:
@@ -139,3 +140,128 @@ class WorkerDistraction_v0(MlBuild):
                     PlanFinishEnemy(),
                 ])
         ]
+
+
+class WorkerDistraction_v1(MlBuild):
+    """Intended to be played verses itself.
+    This build uses agent decisions to run a scout worker toward the enemy.
+    It is also coded to be partially distracted from mining when the scout worker is near it's base by defending.
+    The bot should learn to win via this distraction method."""
+
+    STATE_SIZE = 3
+    ACTION_SIZE = 2
+
+    def __init__(self):
+        super().__init__(WorkerDistraction_v0.STATE_SIZE,
+                         WorkerDistraction_v0.ACTION_SIZE,
+                         self.create_plan(),
+                         result_multiplier=1.0)
+        self.distraction_worker_tags: List[int] = []
+        self.defender_worker_tags: List[int] = []
+        self.scout_is_dead = False
+
+        self.NUMBER_DEFENDERS = 8  # don't set this too high else the game might not end.
+        self.NUMBER_DISTRACTORS = 1
+        self.SPAWNING_POOL_OFFSET = 6
+
+    @property
+    def state(self) -> List[Union[int, float]]:
+        path_distance_between_bases = Path(
+            self.knowledge.pathing_manager.path_finder_terrain.find_path(
+                self.ai.enemy_start_locations[0], self.ai.start_location)).distance
+
+        # state flags
+        self.scout_is_dead = True
+        enemy_workers_distracted: int = 0
+        distance_ratio_to_enemy_main: float = 0.0
+
+        # distractor workers alive
+        distractors = self.ai.workers.tags_in(self.distraction_worker_tags).sorted_by_distance_to(
+            self.ai.enemy_start_locations[0])
+        if len(distractors) > 0:
+            self.scout_is_dead = False
+
+            if len(self.ai.enemy_units.of_type(UnitTypeId.DRONE).closer_than(5, distractors[0].position)) > 0:
+                enemy_workers_distracted = 1
+
+            path_distance_to_enemy_main = Path(self.knowledge.pathing_manager.path_finder_terrain.find_path(
+                self.ai.enemy_start_locations[0], distractors[0].position)).distance
+            distance_ratio_to_enemy_main = path_distance_to_enemy_main / path_distance_between_bases
+
+        return [self.scout_is_dead, enemy_workers_distracted, distance_ratio_to_enemy_main]
+
+    async def start(self, knowledge: 'Knowledge'):
+        await super().start(knowledge)
+        distraction_workers = self.ai.workers.closest_n_units(self.ai.enemy_start_locations[0], self.NUMBER_DISTRACTORS)
+        for worker in distraction_workers:
+            self.knowledge.roles.set_task(UnitTask.Scouting, worker)
+            self.distraction_worker_tags.append(worker.tag)
+
+        defender_workers = self.ai.workers.tags_not_in(self.distraction_worker_tags) \
+            .closest_n_units(self.ai.enemy_start_locations[0], self.NUMBER_DEFENDERS)
+        for worker in defender_workers:
+            self.knowledge.roles.set_task(UnitTask.Reserved, worker)
+            self.defender_worker_tags.append(worker.tag)
+
+    def get_action_name_color(self, action: int) -> Tuple[str, Tuple]:
+        if self.scout_is_dead:
+            return "ACT: DEAD", (255, 255, 255)
+        if action == 1:
+            return ("ACT: ATTACK", (255, 0, 0))
+        if action == 0:
+            return ("ACT: RETREAT", (0, 255, 0))
+
+        return super().get_action_name_color(action)
+
+    def attack(self) -> bool:
+        for worker in self.ai.workers.tags_in(self.distraction_worker_tags):
+            worker.attack(self.ai.enemy_start_locations[0])
+        return True
+
+    def retreat(self):
+        for worker in self.ai.workers.tags_in(self.distraction_worker_tags):
+            worker.move(self.ai.start_location)
+        return True
+
+    def create_plan(self) -> List[Union[ActBase, List[ActBase]]]:
+        """Build the spawning pool in a place where the distracting workers won't accidentally attack it.
+        Otherwise it interferes with training"""
+        if self.ai.start_location.y - self.ai.enemy_start_locations[0].y < 0:
+            # top left spawn - build below start location
+            spawning_pool_pos = Point2((self.ai.start_location.x, self.ai.start_location.y+self.SPAWNING_POOL_OFFSET))
+        else:
+            # bottom right spawn - build above start location
+            spawning_pool_pos = Point2((self.ai.start_location.x, self.ai.start_location.y-self.SPAWNING_POOL_OFFSET))
+
+        return [
+            SequentialList([
+                ActUnit(UnitTypeId.DRONE, UnitTypeId.LARVA, 12),
+                BuildPosition(UnitTypeId.SPAWNINGPOOL, spawning_pool_pos),
+                ActUnit(UnitTypeId.OVERLORD, UnitTypeId.LARVA, 3),
+                ActUnit(UnitTypeId.QUEEN, UnitTypeId.HATCHERY, 1),
+                ActUnit(UnitTypeId.ZERGLING, UnitTypeId.LARVA, 200),
+            ]),
+            SequentialList(
+                [
+                    ActCustom(lambda: self.attack() if self.action == 1 else self.retreat()),
+                    DistributeWorkers(),
+                    PlanZoneDefense(),
+                    AutoOverLord(),
+                    InjectLarva(),
+                    PlanZoneGather(),
+                    PlanZoneAttack(10),
+                    PlanFinishEnemy(),
+                ])
+        ]
+
+    async def execute(self) -> bool:
+        enemy = self.ai.enemy_units.closer_than(10, self.ai.start_location)
+        defenders = self.ai.workers.tags_in(self.defender_worker_tags)
+        if enemy:
+            for worker in defenders:
+                self.knowledge.roles.set_task(UnitTask.Attacking, worker)
+                worker.attack(enemy[0])
+        else:
+            for worker in defenders:
+                self.knowledge.roles.set_task(UnitTask.Gathering, worker)
+        return await super().execute()

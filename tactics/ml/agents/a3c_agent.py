@@ -14,6 +14,8 @@ from tensorflow.keras import layers
 from tactics.ml.agents import BaseMLAgent
 from tactics.ml.agents.memory import Memory
 
+# todo: switch to PPO baseline?: https://github.com/openai/baselines
+
 
 class ModelPaths:
     def __init__(self, model_name):
@@ -142,8 +144,12 @@ def init_optimizer_state(optimizer, model_train_vars):
     optimizer.apply_gradients(zip(zero_grads, model_train_vars))
 
     return
-
-
+#
+# from tensorflow import keras
+#
+# model = keras.models.load_model("../../../data/pysc2-stage1-model-30epoch-0.0001LR/BasicCNN-30-epochs-0.0001-LR-4.2")
+# model.summary()
+# exit()
 
 
 
@@ -153,13 +159,18 @@ class ActorCriticModel(keras.Model):
         self.state_size = state_size
         self.action_size = action_size
         self.dense1 = layers.Dense(100, activation='relu')
+        self.reshape = layers.Reshape((1, 100))
+        self.lstm = layers.LSTM(100, return_sequences=False, input_shape=(1, 100))
         self.policy_logits = layers.Dense(action_size)
         self.dense2 = layers.Dense(100, activation='relu')
         self.values = layers.Dense(1)
 
     def call(self, inputs):
         # Forward pass
-        x = self.dense1(inputs)
+        # x = self.dense1(inputs)
+        d1 = self.dense1(inputs)
+        y = self.reshape(d1)
+        x = self.lstm(y)
         logits = self.policy_logits(x)
         v1 = self.dense2(inputs)
         values = self.values(v1)
